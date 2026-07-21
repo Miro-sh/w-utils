@@ -1,9 +1,29 @@
 [package]
 name = "bcp"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Better CP — une version moderne de cp avec barre de progression"
 license = "MIT"
+
+# Métadonnées pour les paquets .deb (cargo-deb) et .rpm (cargo-generate-rpm).
+# Le binaire musl étant statique, aucune dépendance n'est déclarée.
+[package.metadata.deb]
+maintainer = "Miro-sh"
+section = "utils"
+priority = "optional"
+depends = ""
+assets = [
+    ["target/release/bcp", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/bcp/README", "644"],
+]
+
+[package.metadata.generate-rpm]
+# cargo-generate-rpm ne réécrit pas les chemins (contrairement à cargo-deb) :
+# chemin complet vers le binaire musl produit par .cargo/config.toml.
+assets = [
+    { source = "target/x86_64-unknown-linux-musl/release/bcp", dest = "/usr/bin/bcp", mode = "755" },
+    { source = "README.md", dest = "/usr/share/doc/bcp/README", mode = "644" },
+]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

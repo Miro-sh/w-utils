@@ -44,6 +44,14 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: rust-lld
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Build .deb and .rpm packages
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          cargo install cargo-deb cargo-generate-rpm --locked
+          cargo deb --target ${{ matrix.target }} --no-build \
+            -o bcp-${{ matrix.target }}.deb
+          cargo generate-rpm -o bcp-${{ matrix.target }}.rpm
+
       - name: Package (Linux and macOS)
         if: runner.os != 'Windows'
         run: |
@@ -68,4 +76,6 @@ jobs:
           files: |
             bcp-*.tar.gz
             bcp-*.zip
+            bcp-*.deb
+            bcp-*.rpm
           generate_release_notes: true

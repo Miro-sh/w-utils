@@ -35,12 +35,32 @@ $ bcp -r huge_folder/ /dest/ --no-progress
 
 ## Installation
 
-Grab a prebuilt binary for your platform from the [releases page](https://github.com/Miro-sh/better-cp/releases), unpack it, and put `bcp` somewhere on your `PATH`. Linux builds are fully static and run on any distro.
-
-Or build from source with a [Rust toolchain](https://rustup.rs/):
+Quick install script (Linux and macOS):
 
 ```console
-$ git clone https://github.com/<your-username>/better-cp
+$ curl -sSfL https://raw.githubusercontent.com/Miro-sh/better-cp/main/install.sh | sh
+```
+
+Native packages, from the [releases page](https://github.com/Miro-sh/better-cp/releases):
+
+```console
+# Debian / Ubuntu
+$ sudo dpkg -i bcp-x86_64-unknown-linux-musl.deb
+
+# Fedora / RHEL / openSUSE
+$ sudo rpm -i bcp-x86_64-unknown-linux-musl.rpm
+```
+
+Raw binaries are there too (unpack, put `bcp` on your `PATH`), and if you have a [Rust toolchain](https://rustup.rs/):
+
+```console
+$ cargo install --git https://github.com/Miro-sh/better-cp
+```
+
+Or from a clone:
+
+```console
+$ git clone https://github.com/Miro-sh/better-cp
 $ cd better-cp
 $ cargo install --path .
 ```
