@@ -1,0 +1,8 @@
+# Cible statique musl, linkée avec rust-lld (fourni avec Rust) :
+# aucune toolchain C système n'est nécessaire pour compiler ce projet.
+# Supprimez ce fichier pour compiler vers votre cible native (glibc, etc.).
+[build]
+target = "x86_64-unknown-linux-musl"
+
+[target.x86_64-unknown-linux-musl]
+linker = "rust-lld"
