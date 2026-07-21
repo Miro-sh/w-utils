@@ -1,56 +1,33 @@
 //! bcp — Better CP : une version moderne de `cp` avec barre de progression.
 
+mod cli;
 mod copy;
 mod progress;
 mod utils;
 
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use clap::Parser;
 use humansize::{format_size, DECIMAL};
 
+use cli::Args;
 use copy::{CopyOptions, PlanEntry};
 use progress::CopyProgress;
 use utils::{format_duration, is_interactive, print_error, print_success, print_warn};
 
-#[derive(Parser, Debug)]
-#[command(
-    name = "bcp",
-    version,
-    about = "Better CP — une version moderne de cp avec barre de progression"
-)]
-struct Args {
-    /// Fichier ou répertoire source
-    source: PathBuf,
-
-    /// Fichier ou répertoire de destination
-    destination: PathBuf,
-
-    /// Copie récursive (requis pour les répertoires, comme cp -r)
-    #[arg(short, long)]
-    recursive: bool,
-
-    /// Force l'affichage de la barre de progression
-    #[arg(long, conflicts_with = "no_progress")]
-    progress: bool,
-
-    /// Désactive la barre de progression (mode silencieux, pour les scripts)
-    #[arg(long)]
-    no_progress: bool,
-
-    /// Mode verbeux : affiche chaque fichier copié (comme cp -v)
-    #[arg(short, long)]
-    verbose: bool,
-
-    /// Mode archive : préserve permissions et horodatages
-    #[arg(short, long)]
-    archive: bool,
-}
-
 fn main() {
     let args = Args::parse();
+
+    // Sortie spéciale : génération de la page man (utilisée par le packaging).
+    if args.generate_man {
+        let mut out = std::io::stdout();
+        clap_mangen::Man::new(cli::build_cli())
+            .render(&mut out)
+            .expect("échec du rendu de la page man");
+        return;
+    }
+
     copy::install_ctrlc_handler();
 
     if let Err(err) = run(&args) {
@@ -71,10 +48,14 @@ fn run(args: &Args) -> Result<()> {
     };
 
     // 1. Analyse de la source et construction du plan de copie.
-    let plan = copy::build_plan(&args.source, &args.destination, args.recursive)?;
+    // (clap garantit leur présence sauf pour --generate-man, déjà traité.)
+    let source = args.source.as_deref().expect("source manquante");
+    let destination = args.destination.as_deref().expect("destination manquante");
+
+    let plan = copy::build_plan(source, destination, args.recursive)?;
 
     // 2. Vérification de l'espace disque AVANT d'écrire quoi que ce soit.
-    copy::check_disk_space(plan.total_bytes, &args.destination)?;
+    copy::check_disk_space(plan.total_bytes, destination)?;
 
     // 3. Copie.
     let progress = CopyProgress::new(plan.total_bytes, show_progress);

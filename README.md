@@ -32,6 +32,7 @@ $ bcp -r huge_folder/ /dest/ --no-progress
 - `-v` lists every file as it is copied, like `cp -v`.
 - Pre-flight disk space check with a clear error message, instead of dying at 97%.
 - Symlinks are recreated as symlinks. Sockets, fifos and device files are skipped with a warning.
+- Ships with a man page (`man bcp`), generated from the CLI definition so it never drifts from `--help`.
 
 ## Installation
 

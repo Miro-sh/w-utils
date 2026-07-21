@@ -42,7 +42,24 @@ else
 fi
 
 tar -xzf "$tmp/$asset" -C "$tmp"
-bin="$tmp/bcp-${arch_part}-${os_part}/bcp"
+pkg_dir="$tmp/bcp-${arch_part}-${os_part}"
+bin="$pkg_dir/bcp"
+
+# Installe la page man si l'archive la contient (Linux seulement).
+install_man() {
+    [ -f "$pkg_dir/bcp.1.gz" ] || return 0
+    if [ -w /usr/local/share/man/man1 ] 2>/dev/null || { [ -d /usr/local/share/man ] && [ -w /usr/local/share/man ]; }; then
+        mkdir -p /usr/local/share/man/man1
+        install -m 644 "$pkg_dir/bcp.1.gz" /usr/local/share/man/man1/
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo mkdir -p /usr/local/share/man/man1
+        sudo install -m 644 "$pkg_dir/bcp.1.gz" /usr/local/share/man/man1/
+    else
+        mkdir -p "$HOME/.local/share/man/man1"
+        install -m 644 "$pkg_dir/bcp.1.gz" "$HOME/.local/share/man/man1/"
+        echo "bcp: page man installée dans ~/.local/share/man (ajoutez-le à MANPATH si 'man bcp' échoue)"
+    fi
+}
 
 if [ -n "${BCP_INSTALL_DIR:-}" ]; then
     dest="$BCP_INSTALL_DIR"
@@ -51,7 +68,8 @@ elif [ -w /usr/local/bin ]; then
 elif command -v sudo >/dev/null 2>&1; then
     echo "bcp: installing to /usr/local/bin (sudo)"
     sudo install -m 755 "$bin" /usr/local/bin/bcp
-    echo "bcp: installed, run 'bcp --help' to get started"
+    install_man
+    echo "bcp: installed, run 'bcp --help' or 'man bcp' to get started"
     exit 0
 else
     dest="$HOME/.local/bin"
@@ -59,6 +77,7 @@ fi
 
 mkdir -p "$dest"
 install -m 755 "$bin" "$dest/bcp"
+install_man
 
 case ":$PATH:" in
     *":$dest:"*) ;;

@@ -44,6 +44,12 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: rust-lld
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Generate man page
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          "./target/${{ matrix.target }}/release/bcp" --generate-man > bcp.1
+          gzip -9 bcp.1
+
       - name: Build .deb and .rpm packages
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
@@ -58,6 +64,8 @@ jobs:
           name="bcp-${{ matrix.target }}"
           mkdir -p "$name"
           cp "target/${{ matrix.target }}/release/bcp" README.md LICENSE "$name/"
+          # La page man n'est générée que pour la cible Linux x86_64.
+          [ -f bcp.1.gz ] && cp bcp.1.gz "$name/" || true
           tar -czf "$name.tar.gz" "$name"
 
       - name: Package (Windows)
