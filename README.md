@@ -1,8 +1,9 @@
 # better-cp
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![Rust 1.70+](https://img.shields.io/badge/rust-1.70%2B-orange?logo=rust&logoColor=white)
-![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey)
+[![CI](https://github.com/Miro-sh/better-cp/actions/workflows/ci.yml/badge.svg)](https://github.com/Miro-sh/better-cp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Miro-sh/better-cp)](https://github.com/Miro-sh/better-cp/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
 ![Binary](https://img.shields.io/badge/binary-fully%20static-blue)
 
 `bcp` is a drop-in replacement for `cp` that shows you what it's doing. It prints a live progress bar with throughput and ETA while it copies, and it never leaves a half-written file behind when something goes wrong. Same flags you already know, same exit codes your scripts already check.
@@ -34,7 +35,9 @@ $ bcp -r huge_folder/ /dest/ --no-progress
 
 ## Installation
 
-You need a [Rust toolchain](https://rustup.rs/). Nothing else: the repository pins the target to `x86_64-unknown-linux-musl` and links with rust-lld, so the build works even on a machine with no C compiler at all.
+Grab a prebuilt binary for your platform from the [releases page](https://github.com/Miro-sh/better-cp/releases), unpack it, and put `bcp` somewhere on your `PATH`. Linux builds are fully static and run on any distro.
+
+Or build from source with a [Rust toolchain](https://rustup.rs/):
 
 ```console
 $ git clone https://github.com/<your-username>/better-cp
