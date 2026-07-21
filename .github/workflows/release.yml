@@ -20,8 +20,10 @@ jobs:
             os: ubuntu-latest
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
+          # Intel Mac binaries are cross-compiled on the ARM runner:
+          # macos-13 (Intel) runners are retired and jobs queue forever.
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-latest
           - target: aarch64-apple-darwin
             os: macos-latest
           - target: x86_64-pc-windows-msvc
