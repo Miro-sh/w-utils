@@ -1,30 +1,39 @@
 [package]
-name = "bcp"
-version = "0.1.2"
+name = "w-utils"
+version = "0.1.3"
 edition = "2021"
-description = "Better CP — une version moderne de cp avec barre de progression"
+description = "w-utils — modern Unix utilities in Rust (wcp: cp with a progress bar)"
 license = "MIT"
+repository = "https://github.com/Miro-sh/w-utils"
+
+# La suite w-utils produira plusieurs binaires ; le premier est wcp.
+[[bin]]
+name = "wcp"
+path = "src/main.rs"
 
 # Métadonnées pour les paquets .deb (cargo-deb) et .rpm (cargo-generate-rpm).
 # Le binaire musl étant statique, aucune dépendance n'est déclarée.
+# Le paquet système s'appelle wcp (l'outil installé), pas w-utils (la suite).
 [package.metadata.deb]
+name = "wcp"
 maintainer = "Miro-sh"
 section = "utils"
 priority = "optional"
 depends = ""
 assets = [
-    ["target/release/bcp", "usr/bin/", "755"],
-    ["bcp.1.gz", "usr/share/man/man1/", "644"],
-    ["README.md", "usr/share/doc/bcp/README", "644"],
+    ["target/release/wcp", "usr/bin/", "755"],
+    ["wcp.1.gz", "usr/share/man/man1/", "644"],
+    ["README.md", "usr/share/doc/wcp/README", "644"],
 ]
 
 [package.metadata.generate-rpm]
+name = "wcp"
 # cargo-generate-rpm ne réécrit pas les chemins (contrairement à cargo-deb) :
 # chemin complet vers le binaire musl produit par .cargo/config.toml.
 assets = [
-    { source = "target/x86_64-unknown-linux-musl/release/bcp", dest = "/usr/bin/bcp", mode = "755" },
-    { source = "bcp.1.gz", dest = "/usr/share/man/man1/bcp.1.gz", mode = "644" },
-    { source = "README.md", dest = "/usr/share/doc/bcp/README", mode = "644" },
+    { source = "target/x86_64-unknown-linux-musl/release/wcp", dest = "/usr/bin/wcp", mode = "755" },
+    { source = "wcp.1.gz", dest = "/usr/share/man/man1/wcp.1.gz", mode = "644" },
+    { source = "README.md", dest = "/usr/share/doc/wcp/README", mode = "644" },
 ]
 
 [dependencies]

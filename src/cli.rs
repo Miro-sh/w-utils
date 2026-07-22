@@ -6,10 +6,10 @@ use clap::{CommandFactory, Parser};
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "bcp",
+    name = "wcp",
     version,
-    about = "Better CP — une version moderne de cp avec barre de progression",
-    long_about = "bcp copie fichiers et répertoires comme cp(1), avec une barre de \
+    about = "wcp — une version moderne de cp avec barre de progression",
+    long_about = "wcp copie fichiers et répertoires comme cp(1), avec une barre de \
 progression en direct (pourcentage, vitesse, ETA) et des copies atomiques : \
 chaque fichier est écrit sous un nom temporaire puis renommé, donc une \
 interruption ne laisse jamais de fichier partiel à la destination."
@@ -43,7 +43,7 @@ pub struct Args {
     #[arg(short, long)]
     pub archive: bool,
 
-    /// Génère la page man sur stdout (usage : bcp --generate-man | gzip > bcp.1.gz)
+    /// Génère la page man sur stdout (usage : wcp --generate-man | gzip > wcp.1.gz)
     #[arg(long, hide = true)]
     pub generate_man: bool,
 }

@@ -155,7 +155,7 @@ fn has_trailing_slash(p: &Path) -> bool {
         .ends_with(std::path::MAIN_SEPARATOR)
 }
 
-/// Refuse `bcp -r a a/b` (récursion infinie) et `bcp f f` (auto-écrasement).
+/// Refuse `wcp -r a a/b` (récursion infinie) et `wcp f f` (auto-écrasement).
 fn ensure_not_nested(source: &Path, dst_root: &Path) -> Result<()> {
     let src_abs = normalize_lexical(&absolutize(source));
     let dst_abs = normalize_lexical(&absolutize(dst_root));
@@ -435,7 +435,7 @@ fn rename_over(tmp: &Path, dst: &Path) -> io::Result<()> {
 /// Nom du fichier temporaire : caché, dans le même dossier que la cible
 /// (donc sur le même système de fichiers → le renommage est atomique).
 fn temp_path_for(dst: &Path) -> PathBuf {
-    let mut name = OsString::from(".bcp-tmp-");
+    let mut name = OsString::from(".wcp-tmp-");
     name.push(process::id().to_string());
     name.push("-");
     if let Some(n) = dst.file_name() {
@@ -650,7 +650,7 @@ mod tests {
         execute_plan(&plan, &quiet_opts(), &no_progress()).unwrap();
         for entry in WalkDir::new(t.path()) {
             let entry = entry.unwrap();
-            assert!(!entry.file_name().to_string_lossy().starts_with(".bcp-tmp"));
+            assert!(!entry.file_name().to_string_lossy().starts_with(".wcp-tmp"));
         }
     }
 

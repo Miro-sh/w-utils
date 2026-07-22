@@ -1,27 +1,27 @@
-# better-cp
+# w-utils
 
-[![CI](https://github.com/Miro-sh/better-cp/actions/workflows/ci.yml/badge.svg)](https://github.com/Miro-sh/better-cp/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Miro-sh/better-cp)](https://github.com/Miro-sh/better-cp/releases)
+[![CI](https://github.com/Miro-sh/w-utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Miro-sh/w-utils/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Miro-sh/w-utils)](https://github.com/Miro-sh/w-utils/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
 ![Binary](https://img.shields.io/badge/binary-fully%20static-blue)
 
-`bcp` is a drop-in replacement for `cp` that shows you what it's doing. It prints a live progress bar with throughput and ETA while it copies, and it never leaves a half-written file behind when something goes wrong. Same flags you already know, same exit codes your scripts already check.
+Unix command-line tools, rewritten in Rust with a modern UX. The first member of the suite is **wcp**, a drop-in replacement for `cp` that shows you what it's doing: a live progress bar with throughput and ETA, and copies that never leave a half-written file behind. Same flags you already know, same exit codes your scripts already check.
 
 ```console
-$ bcp -r ~/Photos /mnt/backup
+$ wcp -r ~/Photos /mnt/backup
 [████████████████████░░░░░░░░░░]  67%  2.3 GiB/3.4 GiB  45.2 MiB/s  ETA 25s
 
-$ bcp document.txt /tmp/
+$ wcp document.txt /tmp/
 ✓ Copied document.txt → /tmp/document.txt (12 KB)
 
-$ bcp -r huge_folder/ /dest/ --no-progress
+$ wcp -r huge_folder/ /dest/ --no-progress
 # silence, the exit code tells you how it went
 ```
 
 ## Why
 
-`cp` gives you no feedback. On a 200 GB backup you stare at a blinking cursor for twenty minutes, wondering if anything is happening at all. `bcp` answers that question and fixes a few other rough edges while it's at it: it checks free disk space before it starts, refuses to copy a directory into itself, and cleans up after itself when you hit Ctrl+C halfway through a file.
+`cp` gives you no feedback. On a 200 GB backup you stare at a blinking cursor for twenty minutes, wondering if anything is happening at all. `wcp` answers that question and fixes a few other rough edges while it's at it: it checks free disk space before it starts, refuses to copy a directory into itself, and cleans up after itself when you hit Ctrl+C halfway through a file.
 
 ## Features
 
@@ -32,46 +32,46 @@ $ bcp -r huge_folder/ /dest/ --no-progress
 - `-v` lists every file as it is copied, like `cp -v`.
 - Pre-flight disk space check with a clear error message, instead of dying at 97%.
 - Symlinks are recreated as symlinks. Sockets, fifos and device files are skipped with a warning.
-- Ships with a man page (`man bcp`), generated from the CLI definition so it never drifts from `--help`.
+- Ships with a man page (`man wcp`), generated from the CLI definition so it never drifts from `--help`.
 
 ## Installation
 
 Quick install script (Linux and macOS):
 
 ```console
-$ curl -sSfL https://raw.githubusercontent.com/Miro-sh/better-cp/main/install.sh | sh
+$ curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/install.sh | sh
 ```
 
-Native packages, from the [releases page](https://github.com/Miro-sh/better-cp/releases):
+Native packages, from the [releases page](https://github.com/Miro-sh/w-utils/releases):
 
 ```console
 # Debian / Ubuntu
-$ sudo dpkg -i bcp-x86_64-unknown-linux-musl.deb
+$ sudo dpkg -i wcp-x86_64-unknown-linux-musl.deb
 
 # Fedora / RHEL / openSUSE
-$ sudo rpm -i bcp-x86_64-unknown-linux-musl.rpm
+$ sudo rpm -i wcp-x86_64-unknown-linux-musl.rpm
 ```
 
-Raw binaries are there too (unpack, put `bcp` on your `PATH`), and if you have a [Rust toolchain](https://rustup.rs/):
+Raw binaries are there too (unpack, put `wcp` on your `PATH`), and if you have a [Rust toolchain](https://rustup.rs/):
 
 ```console
-$ cargo install --git https://github.com/Miro-sh/better-cp
+$ cargo install --git https://github.com/Miro-sh/w-utils
 ```
 
 Or from a clone:
 
 ```console
-$ git clone https://github.com/Miro-sh/better-cp
-$ cd better-cp
+$ git clone https://github.com/Miro-sh/w-utils
+$ cd w-utils
 $ cargo install --path .
 ```
 
-This puts a fully static `bcp` binary in `~/.cargo/bin`. Delete `.cargo/config.toml` if you'd rather build for your native target.
+This puts a fully static `wcp` binary in `~/.cargo/bin`. Delete `.cargo/config.toml` if you'd rather build for your native target.
 
 ## Usage
 
 ```
-bcp [OPTIONS] <SOURCE> <DESTINATION>
+wcp [OPTIONS] <SOURCE> <DESTINATION>
 ```
 
 | Flag  | Long            | Effect                                        |
@@ -83,9 +83,9 @@ bcp [OPTIONS] <SOURCE> <DESTINATION>
 |       | `--no-progress` | Force the progress bar off (for scripts)      |
 
 ```console
-$ bcp report.pdf ~/Documents/
-$ bcp -ra ~/Photos /mnt/backup/photos
-$ bcp -rv projects/ /external-drive/
+$ wcp report.pdf ~/Documents/
+$ wcp -ra ~/Photos /mnt/backup/photos
+$ wcp -rv projects/ /external-drive/
 ```
 
 Destination semantics match `cp`: an existing directory receives the source inside it under its original name, anything else is treated as the target file name. One deliberate extension: a trailing `/` on a destination that doesn't exist yet is taken as a directory to create, the way rsync reads it.
@@ -99,7 +99,7 @@ Destination semantics match `cp`: an existing directory receives the source insi
 
 ## Performance notes
 
-With the progress bar off, files go through `std::fs::copy`, which uses `copy_file_range(2)` on Linux and never leaves the kernel. With the bar on, `bcp` copies through a userspace buffer so it can count bytes as they pass: 256 KiB normally, 4 MiB for files above 1 GiB. In practice both paths saturate an NVMe drive. The buffered path costs a few percent on very fast storage and nothing you'd notice on anything slower.
+With the progress bar off, files go through `std::fs::copy`, which uses `copy_file_range(2)` on Linux and never leaves the kernel. With the bar on, `wcp` copies through a userspace buffer so it can count bytes as they pass: 256 KiB normally, 4 MiB for files above 1 GiB. In practice both paths saturate an NVMe drive. The buffered path costs a few percent on very fast storage and nothing you'd notice on anything slower.
 
 ## Development
 
@@ -108,7 +108,7 @@ $ cargo build --release   # compiles with zero warnings
 $ cargo test              # 19 unit and integration tests
 ```
 
-Four small modules: `main.rs` handles the CLI and orchestration, `copy.rs` plans and executes the copy, `progress.rs` owns the bar, `utils.rs` does formatting and terminal detection.
+Four small modules: `main.rs` handles orchestration, `cli.rs` defines the CLI, `copy.rs` plans and executes the copy, `progress.rs` owns the bar, `utils.rs` does formatting and terminal detection. New tools join the suite as additional `[[bin]]` targets in `Cargo.toml`.
 
 ## License
 

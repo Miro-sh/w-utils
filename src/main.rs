@@ -1,4 +1,4 @@
-//! bcp — Better CP : une version moderne de `cp` avec barre de progression.
+//! wcp — une version moderne de `cp` avec barre de progression (suite w-utils).
 
 mod cli;
 mod copy;

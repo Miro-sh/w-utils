@@ -47,25 +47,25 @@ jobs:
       - name: Generate man page
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          "./target/${{ matrix.target }}/release/bcp" --generate-man > bcp.1
-          gzip -9 bcp.1
+          "./target/${{ matrix.target }}/release/wcp" --generate-man > wcp.1
+          gzip -9 wcp.1
 
       - name: Build .deb and .rpm packages
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           cargo install cargo-deb cargo-generate-rpm --locked
           cargo deb --target ${{ matrix.target }} --no-build \
-            -o bcp-${{ matrix.target }}.deb
-          cargo generate-rpm -o bcp-${{ matrix.target }}.rpm
+            -o wcp-${{ matrix.target }}.deb
+          cargo generate-rpm -o wcp-${{ matrix.target }}.rpm
 
       - name: Package (Linux and macOS)
         if: runner.os != 'Windows'
         run: |
-          name="bcp-${{ matrix.target }}"
+          name="wcp-${{ matrix.target }}"
           mkdir -p "$name"
-          cp "target/${{ matrix.target }}/release/bcp" README.md LICENSE "$name/"
+          cp "target/${{ matrix.target }}/release/wcp" README.md LICENSE "$name/"
           # La page man n'est générée que pour la cible Linux x86_64.
-          [ -f bcp.1.gz ] && cp bcp.1.gz "$name/" || true
+          [ -f wcp.1.gz ] && cp wcp.1.gz "$name/" || true
           tar -czf "$name.tar.gz" "$name"
 
       - name: Package (Windows)
@@ -73,17 +73,17 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          $name = "bcp-$env:TARGET"
+          $name = "wcp-$env:TARGET"
           New-Item -ItemType Directory -Force -Path $name | Out-Null
-          Copy-Item "target/$env:TARGET/release/bcp.exe", "README.md", "LICENSE" $name
+          Copy-Item "target/$env:TARGET/release/wcp.exe", "README.md", "LICENSE" $name
           Compress-Archive -Path $name -DestinationPath "$name.zip"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            bcp-*.tar.gz
-            bcp-*.zip
-            bcp-*.deb
-            bcp-*.rpm
+            wcp-*.tar.gz
+            wcp-*.zip
+            wcp-*.deb
+            wcp-*.rpm
           generate_release_notes: true
