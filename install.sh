@@ -60,38 +60,42 @@ pkg_dir="$tmp/w-utils-${arch_part}-${os_part}"
 bin="$pkg_dir/wcp"
 
 # Installe la page man si l'archive la contient (Linux seulement).
+# $1: "system" (/usr/local/share/man) ou "user" (~/.local/share/man)
+# $2: "" ou "sudo"
 install_man() {
     [ -f "$pkg_dir/wcp.1.gz" ] || return 0
-    if [ -w /usr/local/share/man/man1 ] 2>/dev/null || { [ -d /usr/local/share/man ] && [ -w /usr/local/share/man ]; }; then
-        mkdir -p /usr/local/share/man/man1
-        install -m 644 "$pkg_dir/wcp.1.gz" /usr/local/share/man/man1/
-    elif command -v sudo >/dev/null 2>&1; then
-        sudo mkdir -p /usr/local/share/man/man1
-        sudo install -m 644 "$pkg_dir/wcp.1.gz" /usr/local/share/man/man1/
+    if [ "$1" = system ]; then
+        mandir=/usr/local/share/man/man1
     else
-        mkdir -p "$HOME/.local/share/man/man1"
-        install -m 644 "$pkg_dir/wcp.1.gz" "$HOME/.local/share/man/man1/"
-        echo "w-utils: man page installed to ~/.local/share/man (add it to MANPATH if 'man wcp' fails)"
+        mandir="$HOME/.local/share/man/man1"
+    fi
+    $2 mkdir -p "$mandir"
+    $2 install -m 644 "$pkg_dir/wcp.1.gz" "$mandir/"
+    if [ "$1" = user ]; then
+        echo "w-utils: man page installed to $mandir (add it to MANPATH if 'man wcp' fails)"
     fi
 }
 
 if [ -n "${WCP_INSTALL_DIR:-}" ]; then
     dest="$WCP_INSTALL_DIR"
+    mode=user
 elif [ -w /usr/local/bin ]; then
     dest="/usr/local/bin"
+    mode=system
 elif command -v sudo >/dev/null 2>&1; then
     echo "w-utils: installing to /usr/local/bin (sudo)"
     sudo install -m 755 "$bin" /usr/local/bin/wcp
-    install_man
+    install_man system sudo
     echo "w-utils: installed, run 'wcp --help' or 'man wcp' to get started"
     exit 0
 else
     dest="$HOME/.local/bin"
+    mode=user
 fi
 
 mkdir -p "$dest"
 install -m 755 "$bin" "$dest/wcp"
-install_man
+install_man "$mode" ""
 
 case ":$PATH:" in
     *":$dest:"*) ;;
