@@ -9,7 +9,18 @@ permissions:
   contents: write
 
 jobs:
+  # La release est créée une seule fois, AVANT les builds : sinon les jobs de
+  # la matrice se battent pour la créer et un perdant échoue (already_exists).
+  create-release:
+    name: Create release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+
   build:
+    needs: create-release
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -86,4 +97,3 @@ jobs:
             w-utils-*.zip
             w-utils-*.deb
             w-utils-*.rpm
-          generate_release_notes: true
