@@ -116,3 +116,42 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: assets/SHA256SUMS.txt
+
+  # --- Canaux de distribution externes -------------------------------------
+  # Tous dormants par défaut : ils ne tournent que si la variable de repo
+  # correspondante vaut 'true'. Voir packaging/README.md pour l'activation.
+
+  homebrew:
+    name: Homebrew tap
+    needs: checksums
+    if: vars.HOMEBREW_TAP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: script/update-homebrew-tap.sh
+
+  aur:
+    name: AUR (w-utils-bin)
+    needs: checksums
+    if: vars.AUR_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          TAG: ${{ github.ref_name }}
+        run: script/publish-aur.sh
+
+  crates:
+    name: crates.io
+    needs: build
+    if: vars.CRATES_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Publish
+        run: cargo publish --token "${{ secrets.CARGO_REGISTRY_TOKEN }}"
