@@ -1,7 +1,7 @@
 #!/bin/sh
 # wcp installer — downloads the latest release binary and installs it.
 #
-#   curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/install.sh | sh
+#   curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/script/install.sh | sh
 #
 # Env vars: WCP_INSTALL_DIR (default: /usr/local/bin, or ~/.local/bin without sudo)
 

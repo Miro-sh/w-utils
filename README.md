@@ -19,7 +19,7 @@ Unix command-line tools, rewritten in Rust with a modern UX. The first member of
 ## Quick install
 
 ```console
-$ curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/install.sh | sh
+$ curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/script/install.sh | sh
 ```
 
 Packages and other install methods are [further down](#installation).
@@ -63,7 +63,7 @@ $ wcp -r huge_folder/ /dest/ --no-progress
 Quick install script (Linux and macOS):
 
 ```console
-$ curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/install.sh | sh
+$ curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/script/install.sh | sh
 ```
 
 Native packages, from the [releases page](https://github.com/Miro-sh/w-utils/releases):
