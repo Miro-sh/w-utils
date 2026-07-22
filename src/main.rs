@@ -54,6 +54,12 @@ fn run(args: &Args) -> Result<()> {
 
     let plan = copy::build_plan(source, destination, args.recursive)?;
 
+    // --dry-run : on affiche le plan et on s'arrête là, rien n'est écrit.
+    if args.dry_run {
+        print_dry_run(&plan);
+        return Ok(());
+    }
+
     // 2. Vérification de l'espace disque AVANT d'écrire quoi que ce soit.
     copy::check_disk_space(plan.total_bytes, destination)?;
 
@@ -87,6 +93,69 @@ fn run(args: &Args) -> Result<()> {
     Ok(())
 }
 
+/// --dry-run : affiche le plan sans toucher au disque, en signalant les
+/// fichiers qui seraient écrasés.
+fn print_dry_run(plan: &copy::CopyPlan) {
+    use colored::Colorize;
+
+    let mut dirs = 0usize;
+    let mut overwrites = 0usize;
+
+    for entry in &plan.entries {
+        match entry {
+            PlanEntry::Dir { dst, .. } => {
+                dirs += 1;
+                if !dst.exists() {
+                    println!("créer dir   {}", dst.display());
+                }
+            }
+            PlanEntry::Symlink { src, dst } => {
+                println!("lien        {} -> {}", src.display(), dst.display());
+            }
+            PlanEntry::File { src, dst, size } => {
+                if copy::would_overwrite(dst) {
+                    overwrites += 1;
+                    println!(
+                        "{}",
+                        format!(
+                            "écraser     {} -> {} ({})",
+                            src.display(),
+                            dst.display(),
+                            format_size(*size, DECIMAL)
+                        )
+                        .yellow()
+                    );
+                } else {
+                    println!(
+                        "copier      {} -> {} ({})",
+                        src.display(),
+                        dst.display(),
+                        format_size(*size, DECIMAL)
+                    );
+                }
+            }
+        }
+    }
+
+    let summary = format!(
+        "{} fichier(s), {} répertoire(s), {} au total",
+        plan.file_count,
+        dirs,
+        format_size(plan.total_bytes, DECIMAL)
+    );
+    // Flush avant les warnings stderr pour garder l'ordre dans un pipe.
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    if overwrites > 0 {
+        print_warn(&format!("{summary} — attention : {overwrites} écrasement(s)"));
+    } else {
+        println!("{summary}");
+    }
+    if !plan.skipped.is_empty() {
+        print_warn(&format!("{} fichier(s) spéciaux ignoré(s)", plan.skipped.len()));
+    }
+}
+
 /// Résumé final : ligne détaillée pour un fichier unique, agrégée sinon.
 fn print_summary(plan: &copy::CopyPlan, stats: &copy::CopyStats, elapsed: Duration) {
     if plan.file_count == 1 && stats.errors.is_empty() {
@@ -109,11 +178,18 @@ fn print_summary(plan: &copy::CopyPlan, stats: &copy::CopyStats, elapsed: Durati
     } else {
         String::from("—")
     };
-    print_success(&format!(
+    let mut line = format!(
         "{} élément(s) copié(s) ({}) en {} — {}",
         stats.files_copied + stats.dirs_created,
         format_size(stats.bytes_copied, DECIMAL),
         format_duration(elapsed),
         speed
-    ));
+    );
+    if !stats.warnings.is_empty() {
+        line.push_str(&format!(", {} ignoré(s)", stats.warnings.len()));
+    }
+    if !stats.errors.is_empty() {
+        line.push_str(&format!(", {} erreur(s)", stats.errors.len()));
+    }
+    print_success(&line);
 }

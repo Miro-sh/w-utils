@@ -200,6 +200,12 @@ fn normalize_lexical(p: &Path) -> PathBuf {
 // Vérification d'espace disque
 // ---------------------------------------------------------------------------
 
+/// Vrai si la destination existe déjà (y compris lien cassé) : la copie
+/// écraserait ce fichier. Utilisé par --dry-run.
+pub fn would_overwrite(dst: &Path) -> bool {
+    dst.symlink_metadata().is_ok()
+}
+
 /// Échoue tôt si la destination n'a clairement pas assez de place.
 pub fn check_disk_space(total_bytes: u64, destination: &Path) -> Result<()> {
     let probe = existing_ancestor(destination);
@@ -708,6 +714,15 @@ mod tests {
         let plan = build_plan(&src, &dst, false).unwrap();
         execute_plan(&plan, &quiet_opts(), &no_progress()).unwrap();
         assert_eq!(fs::read(t.path().join("newdir/a.txt")).unwrap(), b"x");
+    }
+
+    #[test]
+    fn would_overwrite_detects_existing() {
+        let t = TempDir::new().unwrap();
+        let dst = t.path().join("x");
+        assert!(!would_overwrite(&dst));
+        write(&dst, b"1");
+        assert!(would_overwrite(&dst));
     }
 
     #[test]

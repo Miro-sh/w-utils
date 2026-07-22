@@ -43,6 +43,10 @@ pub struct Args {
     #[arg(short, long)]
     pub archive: bool,
 
+    /// Simule la copie : affiche ce qui serait fait, sans rien écrire
+    #[arg(long)]
+    pub dry_run: bool,
+
     /// Génère la page man sur stdout (usage : wcp --generate-man | gzip > wcp.1.gz)
     #[arg(long, hide = true)]
     pub generate_man: bool,
