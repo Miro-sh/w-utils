@@ -28,6 +28,7 @@ const LARGE_FILE_THRESHOLD: u64 = 1 << 30;
 pub struct CopyOptions {
     pub archive: bool,
     pub verbose: bool,
+    pub resume: bool,
 }
 
 /// Une entrée du plan de copie (fichier, lien symbolique ou répertoire).
@@ -51,6 +52,7 @@ pub struct CopyStats {
     pub files_copied: usize,
     pub dirs_created: usize,
     pub bytes_copied: u64,
+    pub already_present: usize,
     pub warnings: Vec<String>,
     pub errors: Vec<String>,
 }
@@ -206,6 +208,15 @@ pub fn would_overwrite(dst: &Path) -> bool {
     dst.symlink_metadata().is_ok()
 }
 
+/// --resume : un fichier déjà présent avec la bonne taille est considéré
+/// comme copié. Le renommage atomique garantit qu'il n'est pas partiel :
+/// une copie interrompue ne laisse rien sous le nom final.
+pub fn is_up_to_date(dst: &Path, src_size: u64) -> bool {
+    fs::metadata(dst)
+        .map(|m| m.is_file() && m.len() == src_size)
+        .unwrap_or(false)
+}
+
 /// Échoue tôt si la destination n'a clairement pas assez de place.
 pub fn check_disk_space(total_bytes: u64, destination: &Path) -> Result<()> {
     let probe = existing_ancestor(destination);
@@ -261,12 +272,22 @@ pub fn execute_plan(plan: &CopyPlan, opts: &CopyOptions, progress: &CopyProgress
         match entry {
             PlanEntry::Dir { dst, .. } => {
                 dirs.push(entry);
+                let existed = dst.exists();
                 match fs::create_dir_all(dst) {
-                    Ok(()) => stats.dirs_created += 1,
+                    Ok(()) => stats.dirs_created += usize::from(!existed),
                     Err(e) => stats.errors.push(format!("{} : {}", dst.display(), e)),
                 }
             }
             PlanEntry::Symlink { src, dst } => {
+                if opts.resume
+                    && dst
+                        .symlink_metadata()
+                        .map(|m| m.file_type().is_symlink())
+                        .unwrap_or(false)
+                {
+                    stats.already_present += 1;
+                    continue;
+                }
                 let result = ensure_parent(dst).and_then(|()| copy_symlink(src, dst));
                 match result {
                     Ok(()) => {
@@ -281,6 +302,10 @@ pub fn execute_plan(plan: &CopyPlan, opts: &CopyOptions, progress: &CopyProgress
                 }
             }
             PlanEntry::File { src, dst, size } => {
+                if opts.resume && is_up_to_date(dst, *size) {
+                    stats.already_present += 1;
+                    continue;
+                }
                 if let Err(e) = ensure_parent(dst) {
                     stats
                         .errors
@@ -534,7 +559,7 @@ mod tests {
     }
 
     fn quiet_opts() -> CopyOptions {
-        CopyOptions { archive: false, verbose: false }
+        CopyOptions { archive: false, verbose: false, resume: false }
     }
 
     fn make_tree(t: &TempDir) -> PathBuf {
@@ -684,7 +709,7 @@ mod tests {
         fs::set_permissions(&src, fs::Permissions::from_mode(0o750)).unwrap();
         let dst = t.path().join("y.sh");
         let plan = build_plan(&src, &dst, false).unwrap();
-        execute_plan(&plan, &CopyOptions { archive: true, verbose: false }, &no_progress()).unwrap();
+        execute_plan(&plan, &CopyOptions { archive: true, verbose: false, resume: false }, &no_progress()).unwrap();
         assert_eq!(fs::metadata(&dst).unwrap().permissions().mode() & 0o777, 0o750);
     }
 
@@ -723,6 +748,46 @@ mod tests {
         assert!(!would_overwrite(&dst));
         write(&dst, b"1");
         assert!(would_overwrite(&dst));
+    }
+
+    #[test]
+    fn resume_skips_already_copied_files() {
+        let t = TempDir::new().unwrap();
+        let src = make_tree(&t);
+        let backup = t.path().join("backup");
+        fs::create_dir(&backup).unwrap();
+        let opts = CopyOptions { archive: false, verbose: false, resume: true };
+
+        let plan = build_plan(&src, &backup, true).unwrap();
+        let s1 = execute_plan(&plan, &opts, &no_progress()).unwrap();
+        assert_eq!(s1.already_present, 0);
+
+        // Relancer la même commande avec --resume : rien à refaire.
+        let plan2 = build_plan(&src, &backup, true).unwrap();
+        let s2 = execute_plan(&plan2, &opts, &no_progress()).unwrap();
+        assert_eq!(s2.files_copied, 0);
+        assert_eq!(s2.already_present, 2);
+        assert_eq!(s2.bytes_copied, 0);
+    }
+
+    #[test]
+    fn resume_recopies_on_size_mismatch() {
+        let t = TempDir::new().unwrap();
+        let src = make_tree(&t);
+        let backup = t.path().join("backup");
+        fs::create_dir(&backup).unwrap();
+        let opts = CopyOptions { archive: false, verbose: false, resume: true };
+
+        let plan = build_plan(&src, &backup, true).unwrap();
+        execute_plan(&plan, &opts, &no_progress()).unwrap();
+
+        // Fichier destination "corrompu" (taille différente) : --resume le refait.
+        fs::write(backup.join("d/a.txt"), b"XXXXXX").unwrap();
+        let plan2 = build_plan(&src, &backup, true).unwrap();
+        let s2 = execute_plan(&plan2, &opts, &no_progress()).unwrap();
+        assert_eq!(s2.files_copied, 1);
+        assert_eq!(s2.already_present, 1);
+        assert_eq!(fs::read(backup.join("d/a.txt")).unwrap(), b"aaa");
     }
 
     #[test]

@@ -47,6 +47,11 @@ pub struct Args {
     #[arg(long)]
     pub dry_run: bool,
 
+    /// Reprend une copie interrompue : ignore les fichiers déjà présents
+    /// à la destination avec la bonne taille
+    #[arg(long)]
+    pub resume: bool,
+
     /// Génère la page man sur stdout (usage : wcp --generate-man | gzip > wcp.1.gz)
     #[arg(long, hide = true)]
     pub generate_man: bool,

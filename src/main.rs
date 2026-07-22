@@ -56,7 +56,7 @@ fn run(args: &Args) -> Result<()> {
 
     // --dry-run : on affiche le plan et on s'arrête là, rien n'est écrit.
     if args.dry_run {
-        print_dry_run(&plan);
+        print_dry_run(&plan, args.resume);
         return Ok(());
     }
 
@@ -68,6 +68,7 @@ fn run(args: &Args) -> Result<()> {
     let opts = CopyOptions {
         archive: args.archive,
         verbose: args.verbose,
+        resume: args.resume,
     };
 
     let start = Instant::now();
@@ -95,7 +96,7 @@ fn run(args: &Args) -> Result<()> {
 
 /// --dry-run : affiche le plan sans toucher au disque, en signalant les
 /// fichiers qui seraient écrasés.
-fn print_dry_run(plan: &copy::CopyPlan) {
+fn print_dry_run(plan: &copy::CopyPlan, resume: bool) {
     use colored::Colorize;
 
     let mut dirs = 0usize;
@@ -113,7 +114,9 @@ fn print_dry_run(plan: &copy::CopyPlan) {
                 println!("lien        {} -> {}", src.display(), dst.display());
             }
             PlanEntry::File { src, dst, size } => {
-                if copy::would_overwrite(dst) {
+                if resume && copy::is_up_to_date(dst, *size) {
+                    println!("présent     {} -> {} (ignoré)", src.display(), dst.display());
+                } else if copy::would_overwrite(dst) {
                     overwrites += 1;
                     println!(
                         "{}",
@@ -158,7 +161,7 @@ fn print_dry_run(plan: &copy::CopyPlan) {
 
 /// Résumé final : ligne détaillée pour un fichier unique, agrégée sinon.
 fn print_summary(plan: &copy::CopyPlan, stats: &copy::CopyStats, elapsed: Duration) {
-    if plan.file_count == 1 && stats.errors.is_empty() {
+    if plan.file_count == 1 && stats.errors.is_empty() && stats.already_present == 0 {
         if let Some(PlanEntry::File { src, dst, size }) =
             plan.entries.iter().find(|e| matches!(e, PlanEntry::File { .. }))
         {
@@ -185,6 +188,9 @@ fn print_summary(plan: &copy::CopyPlan, stats: &copy::CopyStats, elapsed: Durati
         format_duration(elapsed),
         speed
     );
+    if stats.already_present > 0 {
+        line.push_str(&format!(", {} déjà présent(s)", stats.already_present));
+    }
     if !stats.warnings.is_empty() {
         line.push_str(&format!(", {} ignoré(s)", stats.warnings.len()));
     }

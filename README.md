@@ -56,6 +56,7 @@ $ wcp -r huge_folder/ /dest/ --no-progress
 - `-v` lists every file as it is copied, like `cp -v`.
 - Pre-flight disk space check with a clear error message, instead of dying at 97%.
 - `--dry-run` prints the full plan before anything touches the disk, flagging files that would be overwritten.
+- `--resume` skips files that are already fully copied, so relaunching an interrupted backup only transfers what's missing.
 - Symlinks are recreated as symlinks. Sockets, fifos and device files are skipped with a warning.
 - Ships with a man page (`man wcp`), generated from the CLI definition so it never drifts from `--help`.
 
@@ -114,6 +115,7 @@ wcp [OPTIONS] <SOURCE> <DESTINATION>
 |       | `--progress`    | Force the progress bar on                     |
 |       | `--no-progress` | Force the progress bar off (for scripts)      |
 |       | `--dry-run`     | Print the plan without copying anything       |
+|       | `--resume`      | Skip already-copied files, finish the rest    |
 
 ```console
 $ wcp report.pdf ~/Documents/
@@ -156,7 +158,7 @@ $ cargo uninstall w-utils
 
 ```console
 $ cargo build --release   # compiles with zero warnings
-$ cargo test              # 20 unit and integration tests
+$ cargo test              # 22 unit and integration tests
 ```
 
 Four small modules: `main.rs` handles orchestration, `cli.rs` defines the CLI, `copy.rs` plans and executes the copy, `progress.rs` owns the bar, `utils.rs` does formatting and terminal detection. New tools join the suite as additional `[[bin]]` targets in `Cargo.toml`.
