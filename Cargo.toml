@@ -1,6 +1,6 @@
 [package]
 name = "w-utils"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 description = "w-utils — modern Unix utilities in Rust (wcp: cp with a progress bar)"
 license = "MIT"

@@ -97,3 +97,22 @@ jobs:
             w-utils-*.zip
             w-utils-*.deb
             w-utils-*.rpm
+
+  # Un seul SHA256SUMS.txt couvrant tous les assets, produit une fois les
+  # builds terminés (vérifiable avec : sha256sum -c SHA256SUMS.txt).
+  checksums:
+    name: SHA256SUMS
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate checksums for all assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --pattern "w-utils-*" --dir assets
+          cd assets && sha256sum w-utils-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Upload checksums
+        uses: softprops/action-gh-release@v2
+        with:
+          files: assets/SHA256SUMS.txt

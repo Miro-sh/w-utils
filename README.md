@@ -52,7 +52,14 @@ $ sudo dpkg -i w-utils-x86_64-unknown-linux-musl.deb
 $ sudo rpm -i w-utils-x86_64-unknown-linux-musl.rpm
 ```
 
-Raw binaries are there too (unpack, put `wcp` on your `PATH`), and if you have a [Rust toolchain](https://rustup.rs/):
+Raw binaries are there too (unpack, put `wcp` on your `PATH`). Every release ships a `SHA256SUMS.txt` covering all artifacts:
+
+```console
+$ curl -sSfLO https://github.com/Miro-sh/w-utils/releases/latest/download/SHA256SUMS.txt
+$ sha256sum -c SHA256SUMS.txt --ignore-missing
+```
+
+And if you have a [Rust toolchain](https://rustup.rs/):
 
 ```console
 $ cargo install --git https://github.com/Miro-sh/w-utils

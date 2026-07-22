@@ -33,12 +33,26 @@ trap 'rm -rf "$tmp"' EXIT
 
 echo "w-utils: downloading $url"
 if command -v curl >/dev/null 2>&1; then
-    curl -sSfL "$url" -o "$tmp/$asset"
+    fetch() { curl -sSfL "$1" -o "$2"; }
 elif command -v wget >/dev/null 2>&1; then
-    wget -q "$url" -O "$tmp/$asset"
+    fetch() { wget -q "$1" -O "$2"; }
 else
     echo "w-utils: curl or wget is required" >&2
     exit 1
+fi
+fetch "$url" "$tmp/$asset"
+
+# Vérification SHA256 si la release publie SHA256SUMS.txt (sinon on continue).
+if fetch "$BASE_URL/SHA256SUMS.txt" "$tmp/SHA256SUMS.txt" 2>/dev/null; then
+    if command -v sha256sum >/dev/null 2>&1; then
+        (cd "$tmp" && grep " $asset\$" SHA256SUMS.txt | sha256sum -c -)
+    elif command -v shasum >/dev/null 2>&1; then
+        (cd "$tmp" && grep " $asset\$" SHA256SUMS.txt | shasum -a 256 -c -)
+    else
+        echo "w-utils: no sha256sum/shasum found, skipping checksum verification" >&2
+    fi
+else
+    echo "w-utils: no checksums in this release, skipping verification" >&2
 fi
 
 tar -xzf "$tmp/$asset" -C "$tmp"
