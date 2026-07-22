@@ -109,7 +109,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release download "$GITHUB_REF_NAME" --pattern "w-utils-*" --dir assets
+          gh release download "$GITHUB_REF_NAME" --repo ${{ github.repository }} --pattern "w-utils-*" --dir assets
           cd assets && sha256sum w-utils-* > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - name: Upload checksums
