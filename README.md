@@ -8,6 +8,14 @@
 
 Unix command-line tools, rewritten in Rust with a modern UX. The first member of the suite is **wcp**, a drop-in replacement for `cp` that shows you what it's doing: a live progress bar with throughput and ETA, and copies that never leave a half-written file behind. Same flags you already know, same exit codes your scripts already check.
 
+## Quick install
+
+```console
+$ curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/install.sh | sh
+```
+
+Packages and other install methods are [further down](#installation).
+
 ```console
 $ wcp -r ~/Photos /mnt/backup
 [████████████████████░░░░░░░░░░]  67%  2.3 GiB/3.4 GiB  45.2 MiB/s  ETA 25s
