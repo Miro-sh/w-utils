@@ -37,15 +37,15 @@ assets = [
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-indicatif = "0.17"
-colored = "2"
+indicatif = "0.18"
+colored = "3"
 walkdir = "2"
 humansize = "2"
 anyhow = "1"
 fs2 = "0.4"
 ctrlc = "3"
 filetime = "0.2"
-clap_mangen = "0.2"
+clap_mangen = "0.3"
 
 [dev-dependencies]
 tempfile = "3"
