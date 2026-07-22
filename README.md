@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.svg" alt="w-utils logo" width="128">
+<img src="assets/w-utils-logo.png" alt="w-utils logo" width="160">
 
 # w-utils
 
