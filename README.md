@@ -1,10 +1,18 @@
+<div align="center">
+
+<img src="docs/logo.svg" alt="w-utils logo" width="128">
+
 # w-utils
 
 [![CI](https://github.com/Miro-sh/w-utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Miro-sh/w-utils/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Miro-sh/w-utils)](https://github.com/Miro-sh/w-utils/releases)
+[![dependency status](https://deps.rs/repo/github/Miro-sh/w-utils/status.svg)](https://deps.rs/repo/github/Miro-sh/w-utils)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
-![Binary](https://img.shields.io/badge/binary-fully%20static-blue)
+
+</div>
+
+---
 
 Unix command-line tools, rewritten in Rust with a modern UX. The first member of the suite is **wcp**, a drop-in replacement for `cp` that shows you what it's doing: a live progress bar with throughput and ETA, and copies that never leave a half-written file behind. Same flags you already know, same exit codes your scripts already check.
 
@@ -30,6 +38,14 @@ $ wcp -r huge_folder/ /dest/ --no-progress
 ## Why
 
 `cp` gives you no feedback. On a 200 GB backup you stare at a blinking cursor for twenty minutes, wondering if anything is happening at all. `wcp` answers that question and fixes a few other rough edges while it's at it: it checks free disk space before it starts, refuses to copy a directory into itself, and cleans up after itself when you hit Ctrl+C halfway through a file.
+
+## Goals
+
+- Drop-in replacements: same flags, same destination semantics, same exit codes as the originals. Behavior differences are bugs.
+- Modern UX where it helps: live progress, clear colored errors, sensible defaults.
+- Safe by default: atomic writes, pre-flight checks, nothing half-finished left behind after Ctrl+C.
+- Cross-platform: Linux, macOS and Windows, with fully static Linux binaries that run on any distro.
+- One package, many tools: install `w-utils` once and every utility comes with it.
 
 ## Features
 
@@ -116,6 +132,24 @@ Destination semantics match `cp`: an existing directory receives the source insi
 
 With the progress bar off, files go through `std::fs::copy`, which uses `copy_file_range(2)` on Linux and never leaves the kernel. With the bar on, `wcp` copies through a userspace buffer so it can count bytes as they pass: 256 KiB normally, 4 MiB for files above 1 GiB. In practice both paths saturate an NVMe drive. The buffered path costs a few percent on very fast storage and nothing you'd notice on anything slower.
 
+## Uninstall
+
+It depends on how you installed:
+
+```console
+# install script or manual copy (user install: look in ~/.local instead)
+$ sudo rm /usr/local/bin/wcp /usr/local/share/man/man1/wcp.1.gz
+
+# Debian / Ubuntu
+$ sudo apt remove w-utils
+
+# Fedora / RHEL / openSUSE
+$ sudo dnf remove w-utils
+
+# Rust toolchain
+$ cargo uninstall w-utils
+```
+
 ## Development
 
 ```console
@@ -124,6 +158,10 @@ $ cargo test              # 19 unit and integration tests
 ```
 
 Four small modules: `main.rs` handles orchestration, `cli.rs` defines the CLI, `copy.rs` plans and executes the copy, `progress.rs` owns the bar, `utils.rs` does formatting and terminal detection. New tools join the suite as additional `[[bin]]` targets in `Cargo.toml`.
+
+## Contributing
+
+Issues and pull requests are welcome on [GitHub](https://github.com/Miro-sh/w-utils).
 
 ## License
 
