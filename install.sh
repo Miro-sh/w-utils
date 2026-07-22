@@ -16,33 +16,33 @@ arch=$(uname -m)
 case "$os" in
     Linux)  os_part="unknown-linux-musl" ;;
     Darwin) os_part="apple-darwin" ;;
-    *)      echo "wcp: unsupported OS: $os (download manually from https://github.com/$REPO/releases)" >&2; exit 1 ;;
+    *)      echo "w-utils: unsupported OS: $os (download manually from https://github.com/$REPO/releases)" >&2; exit 1 ;;
 esac
 
 case "$arch" in
     x86_64|amd64) arch_part="x86_64" ;;
     arm64|aarch64) arch_part="aarch64" ;;
-    *)             echo "wcp: unsupported architecture: $arch" >&2; exit 1 ;;
+    *)             echo "w-utils: unsupported architecture: $arch" >&2; exit 1 ;;
 esac
 
-asset="wcp-${arch_part}-${os_part}.tar.gz"
+asset="w-utils-${arch_part}-${os_part}.tar.gz"
 url="$BASE_URL/$asset"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-echo "wcp: downloading $url"
+echo "w-utils: downloading $url"
 if command -v curl >/dev/null 2>&1; then
     curl -sSfL "$url" -o "$tmp/$asset"
 elif command -v wget >/dev/null 2>&1; then
     wget -q "$url" -O "$tmp/$asset"
 else
-    echo "wcp: curl or wget is required" >&2
+    echo "w-utils: curl or wget is required" >&2
     exit 1
 fi
 
 tar -xzf "$tmp/$asset" -C "$tmp"
-pkg_dir="$tmp/wcp-${arch_part}-${os_part}"
+pkg_dir="$tmp/w-utils-${arch_part}-${os_part}"
 bin="$pkg_dir/wcp"
 
 # Installe la page man si l'archive la contient (Linux seulement).
@@ -57,7 +57,7 @@ install_man() {
     else
         mkdir -p "$HOME/.local/share/man/man1"
         install -m 644 "$pkg_dir/wcp.1.gz" "$HOME/.local/share/man/man1/"
-        echo "wcp: man page installed to ~/.local/share/man (add it to MANPATH if 'man wcp' fails)"
+        echo "w-utils: man page installed to ~/.local/share/man (add it to MANPATH if 'man wcp' fails)"
     fi
 }
 
@@ -66,10 +66,10 @@ if [ -n "${WCP_INSTALL_DIR:-}" ]; then
 elif [ -w /usr/local/bin ]; then
     dest="/usr/local/bin"
 elif command -v sudo >/dev/null 2>&1; then
-    echo "wcp: installing to /usr/local/bin (sudo)"
+    echo "w-utils: installing to /usr/local/bin (sudo)"
     sudo install -m 755 "$bin" /usr/local/bin/wcp
     install_man
-    echo "wcp: installed, run 'wcp --help' or 'man wcp' to get started"
+    echo "w-utils: installed, run 'wcp --help' or 'man wcp' to get started"
     exit 0
 else
     dest="$HOME/.local/bin"
@@ -81,7 +81,7 @@ install_man
 
 case ":$PATH:" in
     *":$dest:"*) ;;
-    *) echo "wcp: note: $dest is not in your PATH" ;;
+    *) echo "w-utils: note: $dest is not in your PATH" ;;
 esac
 
-echo "wcp: installed to $dest/wcp, run 'wcp --help' to get started"
+echo "w-utils: installed to $dest/wcp, run 'wcp --help' to get started"

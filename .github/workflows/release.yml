@@ -55,13 +55,13 @@ jobs:
         run: |
           cargo install cargo-deb cargo-generate-rpm --locked
           cargo deb --target ${{ matrix.target }} --no-build \
-            -o wcp-${{ matrix.target }}.deb
-          cargo generate-rpm -o wcp-${{ matrix.target }}.rpm
+            -o w-utils-${{ matrix.target }}.deb
+          cargo generate-rpm -o w-utils-${{ matrix.target }}.rpm
 
       - name: Package (Linux and macOS)
         if: runner.os != 'Windows'
         run: |
-          name="wcp-${{ matrix.target }}"
+          name="w-utils-${{ matrix.target }}"
           mkdir -p "$name"
           cp "target/${{ matrix.target }}/release/wcp" README.md LICENSE "$name/"
           # La page man n'est générée que pour la cible Linux x86_64.
@@ -73,7 +73,7 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          $name = "wcp-$env:TARGET"
+          $name = "w-utils-$env:TARGET"
           New-Item -ItemType Directory -Force -Path $name | Out-Null
           Copy-Item "target/$env:TARGET/release/wcp.exe", "README.md", "LICENSE" $name
           Compress-Archive -Path $name -DestinationPath "$name.zip"
@@ -82,8 +82,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            wcp-*.tar.gz
-            wcp-*.zip
-            wcp-*.deb
-            wcp-*.rpm
+            w-utils-*.tar.gz
+            w-utils-*.zip
+            w-utils-*.deb
+            w-utils-*.rpm
           generate_release_notes: true

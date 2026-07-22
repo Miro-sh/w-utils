@@ -46,10 +46,10 @@ Native packages, from the [releases page](https://github.com/Miro-sh/w-utils/rel
 
 ```console
 # Debian / Ubuntu
-$ sudo dpkg -i wcp-x86_64-unknown-linux-musl.deb
+$ sudo dpkg -i w-utils-x86_64-unknown-linux-musl.deb
 
 # Fedora / RHEL / openSUSE
-$ sudo rpm -i wcp-x86_64-unknown-linux-musl.rpm
+$ sudo rpm -i w-utils-x86_64-unknown-linux-musl.rpm
 ```
 
 Raw binaries are there too (unpack, put `wcp` on your `PATH`), and if you have a [Rust toolchain](https://rustup.rs/):
