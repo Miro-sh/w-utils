@@ -5,7 +5,7 @@
 //! Quand la progression est désactivée (pipe, --no-progress), la barre reste
 //! invisible et `inc()` ne coûte quasiment rien.
 
-use std::cell::Cell;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
@@ -16,7 +16,7 @@ const SHOW_AFTER: Duration = Duration::from_secs(1);
 pub struct CopyProgress {
     bar: ProgressBar,
     enabled: bool,
-    visible: Cell<bool>,
+    visible: AtomicBool,
     start: Instant,
 }
 
@@ -25,7 +25,7 @@ impl CopyProgress {
         let bar = ProgressBar::new(total_bytes);
         bar.set_style(
             ProgressStyle::with_template(
-                "[{wide_bar:.cyan/blue}] {percent:>3}%  {bytes}/{total_bytes}  {bytes_per_sec}  ETA {eta}",
+                "[{wide_bar:.cyan/blue}] {percent:>3}%  {bytes}/{total_bytes}  {bytes_per_sec}  ETA {eta}  {msg}",
             )
             .expect("template indicatif invalide")
             .progress_chars("█░"),
@@ -35,7 +35,7 @@ impl CopyProgress {
         Self {
             bar,
             enabled,
-            visible: Cell::new(false),
+            visible: AtomicBool::new(false),
             start: Instant::now(),
         }
     }
@@ -47,15 +47,22 @@ impl CopyProgress {
     /// Avance la barre et la rend visible si la copie dure plus d'1 s.
     pub fn inc(&self, n: u64) {
         self.bar.inc(n);
-        if self.enabled && !self.visible.get() && self.start.elapsed() >= SHOW_AFTER {
+        if self.enabled && !self.visible.load(Ordering::Relaxed) && self.start.elapsed() >= SHOW_AFTER {
             self.bar.set_draw_target(ProgressDrawTarget::stderr_with_hz(10));
-            self.visible.set(true);
+            self.visible.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// Affiche le nom du fichier en cours à droite de la barre.
+    pub fn set_current_file(&self, name: &str) {
+        if self.enabled {
+            self.bar.set_message(name.to_string());
         }
     }
 
     /// Affiche une ligne de log sans casser la barre (mode verbeux).
     pub fn log(&self, msg: &str) {
-        if self.visible.get() {
+        if self.visible.load(Ordering::Relaxed) {
             self.bar.suspend(|| println!("{msg}"));
         } else {
             println!("{msg}");
@@ -65,7 +72,7 @@ impl CopyProgress {
     /// Termine la barre : laisse l'état final affiché si elle était visible,
     /// sinon ne produit aucune sortie.
     pub fn finish(&self) {
-        if self.visible.get() {
+        if self.visible.load(Ordering::Relaxed) {
             self.bar.finish();
         } else {
             self.bar.finish_and_clear();

@@ -61,6 +61,14 @@ jobs:
           "./target/${{ matrix.target }}/release/wcp" --generate-man > wcp.1
           gzip -9 wcp.1
 
+      - name: Generate shell completions
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          mkdir -p completions
+          "./target/${{ matrix.target }}/release/wcp" --generate-completions bash > completions/wcp.bash
+          "./target/${{ matrix.target }}/release/wcp" --generate-completions zsh > completions/_wcp
+          "./target/${{ matrix.target }}/release/wcp" --generate-completions fish > completions/wcp.fish
+
       - name: Build .deb and .rpm packages
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
@@ -75,8 +83,9 @@ jobs:
           name="w-utils-${{ matrix.target }}"
           mkdir -p "$name"
           cp "target/${{ matrix.target }}/release/wcp" README.md LICENSE "$name/"
-          # La page man n'est générée que pour la cible Linux x86_64.
+          # La page man et les complétions ne sont générées que pour Linux x86_64.
           [ -f wcp.1.gz ] && cp wcp.1.gz "$name/" || true
+          [ -d completions ] && cp -r completions "$name/" || true
           tar -czf "$name.tar.gz" "$name"
 
       - name: Package (Windows)

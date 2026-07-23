@@ -1,6 +1,6 @@
 [package]
 name = "w-utils"
-version = "0.1.7"
+version = "0.2.0"
 edition = "2021"
 description = "w-utils — modern Unix utilities in Rust (wcp: cp with a progress bar)"
 license = "MIT"
@@ -22,6 +22,9 @@ depends = ""
 assets = [
     ["target/release/wcp", "usr/bin/", "755"],
     ["wcp.1.gz", "usr/share/man/man1/", "644"],
+    ["completions/wcp.bash", "usr/share/bash-completion/completions/wcp", "644"],
+    ["completions/_wcp", "usr/share/zsh/site-functions/_wcp", "644"],
+    ["completions/wcp.fish", "usr/share/fish/vendor_completions.d/wcp.fish", "644"],
     ["README.md", "usr/share/doc/w-utils/README", "644"],
 ]
 
@@ -32,6 +35,9 @@ name = "w-utils"
 assets = [
     { source = "target/x86_64-unknown-linux-musl/release/wcp", dest = "/usr/bin/wcp", mode = "755" },
     { source = "wcp.1.gz", dest = "/usr/share/man/man1/wcp.1.gz", mode = "644" },
+    { source = "completions/wcp.bash", dest = "/usr/share/bash-completion/completions/wcp", mode = "644" },
+    { source = "completions/_wcp", dest = "/usr/share/zsh/site-functions/_wcp", mode = "644" },
+    { source = "completions/wcp.fish", dest = "/usr/share/fish/vendor_completions.d/wcp.fish", mode = "644" },
     { source = "README.md", dest = "/usr/share/doc/w-utils/README", mode = "644" },
 ]
 
@@ -46,6 +52,10 @@ fs2 = "0.4"
 ctrlc = "3"
 filetime = "0.2"
 clap_mangen = "0.3"
+clap_complete = "4"
+libc = "0.2"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+globset = "0.4"
 
 [dev-dependencies]
 tempfile = "3"

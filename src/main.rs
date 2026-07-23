@@ -1,4 +1,4 @@
-//! wcp — une version moderne de `cp` avec barre de progression (suite w-utils).
+//! wcp — cp(1) GNU avec barre de progression (suite w-utils).
 
 mod cli;
 mod copy;
@@ -7,11 +7,11 @@ mod utils;
 
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use humansize::{format_size, DECIMAL};
 
-use cli::Args;
+use cli::{Args, Config, CopyMode, Overwrite};
 use copy::{CopyOptions, PlanEntry};
 use progress::CopyProgress;
 use utils::{format_duration, is_interactive, print_error, print_success, print_warn};
@@ -19,12 +19,16 @@ use utils::{format_duration, is_interactive, print_error, print_success, print_w
 fn main() {
     let args = Args::parse();
 
-    // Sortie spéciale : génération de la page man (utilisée par le packaging).
+    // Sorties spéciales : page man et complétions (utilisées par le packaging).
     if args.generate_man {
         let mut out = std::io::stdout();
-        clap_mangen::Man::new(cli::build_cli())
-            .render(&mut out)
-            .expect("échec du rendu de la page man");
+        // Erreur ignorée : un pipe fermé en amont (| head) ne doit pas paniquer.
+        let _ = clap_mangen::Man::new(cli::build_cli()).render(&mut out);
+        return;
+    }
+    if let Some(shell) = args.generate_completions {
+        let mut out = std::io::stdout();
+        clap_complete::generate(shell, &mut cli::build_cli(), "wcp", &mut out);
         return;
     }
 
@@ -37,38 +41,87 @@ fn main() {
 }
 
 fn run(args: &Args) -> Result<()> {
-    let interactive = is_interactive();
-    // Priorité : --no-progress > --progress > auto (terminal interactif).
-    let show_progress = if args.no_progress {
-        false
-    } else if args.progress {
-        true
+    let cfg = args.resolve()?;
+
+    if cfg.explicit_context {
+        print_warn("l'attribut 'context' (SELinux/SMACK) n'est pas géré : ignoré");
+    }
+
+    // Pas de barre pour les modes sans données (liens, attributs seuls),
+    // ni en sortie JSON (destinée aux scripts).
+    let show_progress = match cfg.progress {
+        Some(forced) => forced,
+        None => is_interactive(),
+    } && cfg.mode == CopyMode::Copy
+        && !cfg.attributes_only
+        && !cfg.json;
+
+    // -j : auto = nombre de cœurs (plafonné à 8) ; -i reste séquentiel
+    // (les questions se posent une par une).
+    let jobs = if cfg.jobs == 1 || cfg.overwrite == Overwrite::Interactive {
+        1
+    } else if cfg.jobs == 0 {
+        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1).min(8)
     } else {
-        interactive
+        cfg.jobs
     };
 
-    // 1. Analyse de la source et construction du plan de copie.
-    // (clap garantit leur présence sauf pour --generate-man, déjà traité.)
-    let source = args.source.as_deref().expect("source manquante");
-    let destination = args.destination.as_deref().expect("destination manquante");
+    // 1. Analyse des sources et construction du plan de copie.
+    let plan_cfg = copy::PlanConfig {
+        recursive: cfg.recursive,
+        deref: cfg.deref,
+        parents: cfg.parents,
+        one_file_system: cfg.one_file_system,
+        copy_contents: cfg.copy_contents,
+        preserve_links: cfg.preserve.links,
+        dest_never_dir: cfg.dest_never_dir,
+        remove_destination: cfg.remove_destination,
+        exclude: build_exclude_matcher(&cfg)?,
+    };
+    let plan = copy::build_plan(&cfg.sources, &cfg.destination, &plan_cfg)?;
 
-    let plan = copy::build_plan(source, destination, args.recursive)?;
+    // Erreurs d'analyse (source absente, répertoire sans -r...) : affichées
+    // comme cp, mais elles n'empêchent pas le reste du plan de s'exécuter.
+    for error in &plan.errors {
+        print_error(error);
+    }
 
     // --dry-run : on affiche le plan et on s'arrête là, rien n'est écrit.
-    if args.dry_run {
-        print_dry_run(&plan, args.resume);
-        return Ok(());
+    if cfg.dry_run {
+        if cfg.json {
+            println!("{}", json_plan(&plan));
+        } else {
+            print_dry_run(&plan, &cfg);
+        }
+        return if plan.errors.is_empty() {
+            Ok(())
+        } else {
+            anyhow::bail!("{} erreur(s) pendant l'analyse", plan.errors.len())
+        };
     }
 
     // 2. Vérification de l'espace disque AVANT d'écrire quoi que ce soit.
-    copy::check_disk_space(plan.total_bytes, destination)?;
+    if cfg.mode == CopyMode::Copy && !cfg.attributes_only {
+        copy::check_disk_space(plan.total_bytes, &cfg.destination)?;
+    }
 
     // 3. Copie.
     let progress = CopyProgress::new(plan.total_bytes, show_progress);
     let opts = CopyOptions {
-        archive: args.archive,
-        verbose: args.verbose,
-        resume: args.resume,
+        mode: cfg.mode,
+        overwrite: cfg.overwrite,
+        preserve: cfg.preserve,
+        backup: cfg.backup,
+        backup_suffix: cfg.backup_suffix.clone(),
+        reflink: cfg.reflink,
+        sparse: cfg.sparse,
+        remove_destination: cfg.remove_destination,
+        attributes_only: cfg.attributes_only,
+        verbose: cfg.verbose,
+        resume: cfg.resume,
+        verify: cfg.verify,
+        jobs,
+        bwlimit: cfg.bwlimit,
     };
 
     let start = Instant::now();
@@ -84,19 +137,126 @@ fn run(args: &Args) -> Result<()> {
         print_error(error);
     }
 
-    if interactive || args.verbose {
+    if cfg.json {
+        println!("{}", json_summary(&plan, &stats, elapsed));
+    } else if is_interactive() || cfg.verbose {
         print_summary(&plan, &stats, elapsed);
     }
 
-    if !stats.errors.is_empty() {
-        anyhow::bail!("{} erreur(s) pendant la copie", stats.errors.len());
+    let total_errors = stats.errors.len() + plan.errors.len();
+    if total_errors > 0 {
+        anyhow::bail!("{} erreur(s) pendant la copie", total_errors);
     }
     Ok(())
 }
 
+/// Construit le matcher --exclude / --exclude-from (lignes vides et
+/// commentaires # ignorés, comme rsync).
+fn build_exclude_matcher(cfg: &Config) -> Result<Option<globset::GlobSet>> {
+    let mut patterns = cfg.exclude.clone();
+    for file in &cfg.exclude_from {
+        let content = std::fs::read_to_string(file)
+            .with_context(|| format!("impossible de lire le fichier d'exclusions '{}'", file.display()))?;
+        for line in content.lines() {
+            let line = line.trim();
+            if !line.is_empty() && !line.starts_with('#') {
+                patterns.push(line.to_string());
+            }
+        }
+    }
+    if patterns.is_empty() {
+        return Ok(None);
+    }
+    let mut builder = globset::GlobSetBuilder::new();
+    for pat in &patterns {
+        // literal_separator(false) : '*' traverse les '/', donc "*.log"
+        // exclut aussi "sub/dir/x.log" (comportement type rsync).
+        builder.add(
+            globset::GlobBuilder::new(pat)
+                .literal_separator(false)
+                .build()
+                .with_context(|| format!("motif d'exclusion invalide : '{pat}'"))?,
+        );
+    }
+    Ok(Some(builder.build().expect("globset construit")))
+}
+
+// ---------------------------------------------------------------------------
+// Sortie JSON (--json)
+// ---------------------------------------------------------------------------
+
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+fn json_string_array(items: &[String]) -> String {
+    let inner: Vec<String> = items.iter().map(|s| format!("\"{}\"", json_escape(s))).collect();
+    format!("[{}]", inner.join(","))
+}
+
+fn json_summary(plan: &copy::CopyPlan, stats: &copy::CopyStats, elapsed: Duration) -> String {
+    format!(
+        "{{\"files_copied\":{},\"dirs_created\":{},\"bytes_copied\":{},\"already_present\":{},\
+\"skipped\":{},\"excluded\":{},\"verified\":{},\"duration_secs\":{:.3},\"warnings\":{},\"errors\":{}}}",
+        stats.files_copied,
+        stats.dirs_created,
+        stats.bytes_copied,
+        stats.already_present,
+        stats.skipped,
+        plan.excluded,
+        stats.verified,
+        elapsed.as_secs_f64(),
+        json_string_array(&stats.warnings),
+        json_string_array(&stats.errors)
+    )
+}
+
+fn json_plan(plan: &copy::CopyPlan) -> String {
+    let mut entries = String::from("[");
+    let mut first = true;
+    for e in &plan.entries {
+        let (action, src, dst, size) = match e {
+            PlanEntry::File { src, dst, size, .. } => ("copy", src, dst, *size),
+            PlanEntry::Symlink { src, dst } => ("symlink", src, dst, 0),
+            PlanEntry::Dir { src, dst } => ("mkdir", src, dst, 0),
+            PlanEntry::Fifo { src, dst } => ("fifo", src, dst, 0),
+            PlanEntry::Special { src, dst } => ("special", src, dst, 0),
+            PlanEntry::HardLink { link, dst } => ("hardlink", link, dst, 0),
+        };
+        if !first {
+            entries.push(',');
+        }
+        first = false;
+        entries.push_str(&format!(
+            "{{\"action\":\"{}\",\"src\":\"{}\",\"dst\":\"{}\",\"size\":{}}}",
+            action,
+            json_escape(&src.display().to_string()),
+            json_escape(&dst.display().to_string()),
+            size
+        ));
+    }
+    entries.push(']');
+    format!(
+        "{{\"entries\":{},\"total_bytes\":{},\"file_count\":{},\"excluded\":{}}}",
+        entries, plan.total_bytes, plan.file_count, plan.excluded
+    )
+}
+
 /// --dry-run : affiche le plan sans toucher au disque, en signalant les
-/// fichiers qui seraient écrasés.
-fn print_dry_run(plan: &copy::CopyPlan, resume: bool) {
+/// fichiers qui seraient écrasés ou ignorés.
+fn print_dry_run(plan: &copy::CopyPlan, cfg: &Config) {
     use colored::Colorize;
 
     let mut dirs = 0usize;
@@ -113,15 +273,28 @@ fn print_dry_run(plan: &copy::CopyPlan, resume: bool) {
             PlanEntry::Symlink { src, dst } => {
                 println!("lien        {} -> {}", src.display(), dst.display());
             }
-            PlanEntry::File { src, dst, size } => {
-                if resume && copy::is_up_to_date(dst, *size) {
+            PlanEntry::HardLink { link, dst } => {
+                println!("lien dur    {} == {}", link.display(), dst.display());
+            }
+            PlanEntry::Fifo { src, dst } => {
+                println!("fifo        {} -> {}", src.display(), dst.display());
+            }
+            PlanEntry::Special { src, dst } => {
+                println!("spécial     {} -> {}", src.display(), dst.display());
+            }
+            PlanEntry::File { src, dst, size, .. } => {
+                let exists = copy::would_overwrite(dst);
+                if exists && cfg.overwrite == Overwrite::NoClobber {
+                    println!("ignoré      {} (existe déjà)", dst.display());
+                } else if cfg.resume && copy::is_up_to_date(dst, *size) {
                     println!("présent     {} -> {} (ignoré)", src.display(), dst.display());
-                } else if copy::would_overwrite(dst) {
+                } else if exists {
                     overwrites += 1;
+                    let backup = if cfg.backup.is_some() { " (sauvegarde)" } else { "" };
                     println!(
                         "{}",
                         format!(
-                            "écraser     {} -> {} ({})",
+                            "écraser     {} -> {} ({}){backup}",
                             src.display(),
                             dst.display(),
                             format_size(*size, DECIMAL)
@@ -157,12 +330,19 @@ fn print_dry_run(plan: &copy::CopyPlan, resume: bool) {
     if !plan.skipped.is_empty() {
         print_warn(&format!("{} fichier(s) spéciaux ignoré(s)", plan.skipped.len()));
     }
+    if plan.excluded > 0 {
+        println!("{} élément(s) exclu(s)", plan.excluded);
+    }
 }
 
 /// Résumé final : ligne détaillée pour un fichier unique, agrégée sinon.
 fn print_summary(plan: &copy::CopyPlan, stats: &copy::CopyStats, elapsed: Duration) {
-    if plan.file_count == 1 && stats.errors.is_empty() && stats.already_present == 0 {
-        if let Some(PlanEntry::File { src, dst, size }) =
+    if plan.file_count == 1
+        && stats.errors.is_empty()
+        && stats.already_present == 0
+        && stats.skipped == 0
+    {
+        if let Some(PlanEntry::File { src, dst, size, .. }) =
             plan.entries.iter().find(|e| matches!(e, PlanEntry::File { .. }))
         {
             print_success(&format!(
@@ -191,8 +371,17 @@ fn print_summary(plan: &copy::CopyPlan, stats: &copy::CopyStats, elapsed: Durati
     if stats.already_present > 0 {
         line.push_str(&format!(", {} déjà présent(s)", stats.already_present));
     }
+    if stats.skipped > 0 {
+        line.push_str(&format!(", {} ignoré(s)", stats.skipped));
+    }
+    if plan.excluded > 0 {
+        line.push_str(&format!(", {} exclu(s)", plan.excluded));
+    }
+    if stats.verified > 0 {
+        line.push_str(&format!(", {} vérifié(s)", stats.verified));
+    }
     if !stats.warnings.is_empty() {
-        line.push_str(&format!(", {} ignoré(s)", stats.warnings.len()));
+        line.push_str(&format!(", {} avertissement(s)", stats.warnings.len()));
     }
     if !stats.errors.is_empty() {
         line.push_str(&format!(", {} erreur(s)", stats.errors.len()));
