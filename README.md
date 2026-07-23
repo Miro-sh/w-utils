@@ -24,16 +24,7 @@ $ curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/script/insta
 
 Packages and other install methods are [further down](#installation).
 
-```console
-$ wcp -r ~/Photos /mnt/backup
-[████████████████████░░░░░░░░░░]  67%  2.3 GiB/3.4 GiB  45.2 MiB/s  ETA 25s
-
-$ wcp document.txt /tmp/
-✓ Copied document.txt → /tmp/document.txt (12 KB)
-
-$ wcp -r huge_folder/ /dest/ --no-progress
-# silence, the exit code tells you how it went
-```
+<img src="assets/readme-example.png">
 
 ## Why
 
