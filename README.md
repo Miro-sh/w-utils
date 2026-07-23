@@ -14,7 +14,7 @@
 
 ---
 
-Unix command-line tools, rewritten in Rust with a modern UX. The suite ships **wcp**, a drop-in replacement for `cp`, and **wmv**, a drop-in replacement for `mv` — both show you what they're doing: a live progress bar with throughput and ETA, and operations that never leave a half-written file behind. Same flags you already know, same exit codes your scripts already check.
+Unix command-line tools, rewritten in Rust with a modern UX. The suite ships **wcp**, a drop-in replacement for `cp`, and **wmv**, a drop-in replacement for `mv`. Both show you what they're doing: a live progress bar with throughput and ETA, and operations that never leave a half-written file behind. Same flags you already know, same exit codes your scripts already check.
 
 ## The suite
 
@@ -51,7 +51,7 @@ Packages and other install methods are [further down](#installation).
 - Atomic by default. Every file is written under a temporary name in the destination directory and renamed into place once complete. An interrupted copy leaves no partial files at the destination.
 - Stays out of your way. The bar only appears after one second of copying, so quick copies don't flash it. Piped or scripted output disables the bar automatically, exactly how `cp` would behave.
 - Full GNU `cp` flag coverage: multiple sources, `-t`/`-T`, `-i`/`-n`/`-u`/`-f`, `-L`/`-P`/`-H`/`-d`, `-p`/`--preserve`/`--no-preserve`, `-l`/`-s`, `-b`/`-S` backups, `--parents`, `-x`, `--reflink`, `--sparse`, `--remove-destination`, `--attributes-only`, `--copy-contents`, `--strip-trailing-slashes`.
-- `-a` archive mode for real: permissions, timestamps, ownership (when root), hard links and xattrs preserved, directory metadata included.
+- `-a` is a complete archive mode: permissions, timestamps, ownership (when root), hard links and xattrs, directory metadata included.
 - `-j N` parallel copies: many small files at once, one worker per core by default.
 - `--verify` re-reads every copied file and compares xxh3 checksums before the file lands under its final name.
 - `--bwlimit 10m` throttles the copy rate, shared across workers.
@@ -70,7 +70,7 @@ Packages and other install methods are [further down](#installation).
 
 Everything GNU `cp` does, `wcp` does the same way: every flag, the destination rules, the exit codes, writing through symlinks, refusing dangling ones, `-i/-n/-u` last-one-wins, backups, sparse files, reflinks. The CI test suite runs both tools on the same scenarios and diffs the resulting trees.
 
-On top of that, a handful of **deliberate** differences — each one is a fix or an improvement, never an accident:
+Beyond compatibility, `wcp` makes a few deliberate different choices:
 
 | Situation | GNU `cp` | `wcp` |
 |---|---|---|
@@ -86,9 +86,9 @@ On top of that, a handful of **deliberate** differences — each one is a fix or
 | Scripts | Parse stderr, guess state | `--json` machine-readable summary, `--dry-run` plan, `--resume` for restarts |
 | Bandwidth | No control | `--bwlimit 10m` global throttle |
 
-And the honest limitations:
+Known limitations:
 
-- SELinux/SMACK contexts (`-Z`, `--context`) are not handled — `--preserve=context` prints a warning and moves on. Everything else in `--preserve=all` (mode, ownership, timestamps, links, xattrs) is fully supported.
+- SELinux/SMACK contexts (`-Z`, `--context`) are not handled. `--preserve=context` prints a warning and moves on. Everything else in `--preserve=all` (mode, ownership, timestamps, links, xattrs) is fully supported.
 - `--debug` is not implemented.
 - Error messages are in French and colored; exit codes match `cp` exactly (0 success, 1 any failure, 2 usage error), so scripts that check `$?` are unaffected.
 
@@ -116,7 +116,7 @@ $ sudo rpm -i w-utils-x86_64-unknown-linux-musl.rpm
 $ paru -S w-utils-bin
 ```
 
-Raw binaries are there too (unpack, put `wcp` on your `PATH`). Every release ships a `SHA256SUMS.txt` covering all artifacts:
+Raw binaries are there too (unpack, put `wcp` and `wmv` on your `PATH`). Every release ships a `SHA256SUMS.txt` covering all artifacts:
 
 ```console
 $ curl -sSfLO https://github.com/Miro-sh/w-utils/releases/latest/download/SHA256SUMS.txt
@@ -137,7 +137,7 @@ $ cd w-utils
 $ cargo install --path .
 ```
 
-This puts a fully static `wcp` binary in `~/.cargo/bin`. Delete `.cargo/config.toml` if you'd rather build for your native target.
+This puts fully static `wcp` and `wmv` binaries in `~/.cargo/bin`. Delete `.cargo/config.toml` if you'd rather build for your native target.
 
 ## Usage
 
@@ -212,9 +212,9 @@ Destination semantics match `cp`: an existing directory receives the source insi
 
 With the progress bar off, files go through `std::fs::copy`, which uses `copy_file_range(2)` on Linux and never leaves the kernel. With the bar on, `wcp` copies through a userspace buffer so it can count bytes as they pass: 256 KiB normally, 4 MiB for files above 1 GiB. In practice both paths saturate an NVMe drive. The buffered path costs a few percent on very fast storage and nothing you'd notice on anything slower.
 
-## wmv — mv with a progress bar
+## wmv: mv with a progress bar
 
-`wmv` is a drop-in replacement for `mv`. On the same filesystem it does exactly what `mv` does — an instant `rename(2)`. The interesting part is cross-device moves, which are copy + delete in disguise: that's where `wmv` brings the full `wcp` engine.
+On the same filesystem `wmv` does exactly what `mv` does: an instant `rename(2)`. Cross-device moves are the interesting case, since they are really copy + delete, and `wmv` runs them through the full `wcp` engine.
 
 ```
 wmv [OPTIONS] <SOURCE...> <DESTINATION>
@@ -243,7 +243,7 @@ $ wmv --dry-run * /mnt/other-disk/     # which entries rename instantly, which n
 Safety rules that make `wmv` stricter than `mv`:
 
 - The source is deleted **only after the copy fully succeeds**. An interrupted cross-device move leaves the source intact and no partial files at the destination.
-- Unlike `cp` (and `wcp`), `wmv` replaces a destination *symlink itself* instead of writing through it — exactly like `mv`.
+- Unlike `cp` (and `wcp`), `wmv` replaces a destination *symlink itself* instead of writing through it, exactly like `mv`.
 - Everything is preserved on cross-device moves, like `cp -a`: permissions, timestamps, ownership, hard links and xattrs.
 
 ## Uninstall
