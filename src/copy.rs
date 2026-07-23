@@ -19,7 +19,7 @@ use anyhow::{bail, Context, Result};
 use filetime::{set_file_times, set_symlink_file_times, FileTime};
 use walkdir::WalkDir;
 
-use crate::cli::{BackupControl, CopyMode, Deref, Overwrite, Preserve};
+use crate::options::{BackupControl, CopyMode, Deref, Overwrite, Preserve};
 use crate::progress::CopyProgress;
 
 /// Buffer standard pour la copie avec progression.
@@ -137,7 +137,7 @@ pub struct CopyStats {
 
 impl CopyStats {
     /// Fusionne les stats d'un thread worker dans le total global.
-    fn merge(&mut self, other: CopyStats) {
+    pub(crate) fn merge(&mut self, other: CopyStats) {
         self.files_copied += other.files_copied;
         self.dirs_created += other.dirs_created;
         self.bytes_copied += other.bytes_copied;
@@ -356,6 +356,37 @@ fn stat(p: &Path, follow: bool) -> io::Result<fs::Metadata> {
     if follow { fs::metadata(p) } else { fs::symlink_metadata(p) }
 }
 
+/// Construit le matcher --exclude / --exclude-from (lignes vides et
+/// commentaires # ignorés, comme rsync). Partagé par wcp et wmv.
+pub fn build_exclude_matcher(exclude: &[String], exclude_from: &[PathBuf]) -> Result<Option<globset::GlobSet>> {
+    let mut patterns = exclude.to_vec();
+    for file in exclude_from {
+        let content = fs::read_to_string(file)
+            .with_context(|| format!("impossible de lire le fichier d'exclusions '{}'", file.display()))?;
+        for line in content.lines() {
+            let line = line.trim();
+            if !line.is_empty() && !line.starts_with('#') {
+                patterns.push(line.to_string());
+            }
+        }
+    }
+    if patterns.is_empty() {
+        return Ok(None);
+    }
+    let mut builder = globset::GlobSetBuilder::new();
+    for pat in &patterns {
+        // literal_separator(false) : '*' traverse les '/', donc "*.log"
+        // exclut aussi "sub/dir/x.log" (comportement type rsync).
+        builder.add(
+            globset::GlobBuilder::new(pat)
+                .literal_separator(false)
+                .build()
+                .with_context(|| format!("motif d'exclusion invalide : '{pat}'"))?,
+        );
+    }
+    Ok(Some(builder.build().expect("globset construit")))
+}
+
 /// --exclude : le motif est testé sur le chemin relatif à la racine copiée.
 fn is_excluded(rel: &Path, cfg: &PlanConfig) -> bool {
     match &cfg.exclude {
@@ -367,13 +398,13 @@ fn is_excluded(rel: &Path, cfg: &PlanConfig) -> bool {
 /// (dev, ino, nlink) : identifie un fichier de façon unique sur son système
 /// de fichiers (détection « même fichier » et des liens durs).
 #[cfg(unix)]
-fn file_ids(m: &fs::Metadata) -> (u64, u64, u64) {
+pub(crate) fn file_ids(m: &fs::Metadata) -> (u64, u64, u64) {
     use std::os::unix::fs::MetadataExt;
     (m.dev(), m.ino(), m.nlink())
 }
 
 #[cfg(not(unix))]
-fn file_ids(_m: &fs::Metadata) -> (u64, u64, u64) {
+pub(crate) fn file_ids(_m: &fs::Metadata) -> (u64, u64, u64) {
     (0, 0, 1)
 }
 
@@ -415,7 +446,7 @@ fn is_fifo_ft(_ft: &fs::FileType) -> bool {
 /// la source *dedans* en gardant son nom ; sinon la destination est le nom final.
 /// --parents recrée le chemin complet de la source sous la destination.
 /// Bonus UX : un « / » final signale un répertoire à créer (comme rsync).
-fn dest_root_for(source: &Path, destination: &Path, cfg: &PlanConfig) -> PathBuf {
+pub(crate) fn dest_root_for(source: &Path, destination: &Path, cfg: &PlanConfig) -> PathBuf {
     if cfg.parents {
         return destination.join(strip_root(source));
     }
@@ -445,12 +476,12 @@ fn strip_root(p: &Path) -> PathBuf {
 }
 
 /// Path normalise et supprime les « / » finaux : il faut regarder la chaîne brute.
-fn has_trailing_slash(p: &Path) -> bool {
+pub(crate) fn has_trailing_slash(p: &Path) -> bool {
     p.as_os_str().to_string_lossy().ends_with(std::path::MAIN_SEPARATOR)
 }
 
 /// Refuse `wcp -r a a/b` (récursion infinie) et `wcp f f` (auto-écrasement).
-fn ensure_not_nested(source: &Path, dst_root: &Path) -> Result<()> {
+pub(crate) fn ensure_not_nested(source: &Path, dst_root: &Path) -> Result<()> {
     let src_abs = normalize_lexical(&absolutize(source));
     let dst_abs = normalize_lexical(&absolutize(dst_root));
     if dst_abs == src_abs {
@@ -524,7 +555,7 @@ pub fn check_disk_space(total_bytes: u64, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-fn existing_ancestor(p: &Path) -> PathBuf {
+pub(crate) fn existing_ancestor(p: &Path) -> PathBuf {
     let mut cur = p;
     loop {
         if cur.exists() {
@@ -534,6 +565,16 @@ fn existing_ancestor(p: &Path) -> PathBuf {
             Some(parent) => cur = parent,
             None => return PathBuf::from("/"),
         }
+    }
+}
+
+/// Vrai si `a` et `b` semblent être sur le même système de fichiers
+/// (même st_dev) — donc si un rename(2) entre les deux réussirait.
+pub fn same_file_system(a: &Path, b: &Path) -> bool {
+    let probe = existing_ancestor(b);
+    match (fs::metadata(a), fs::metadata(&probe)) {
+        (Ok(ma), Ok(mb)) => file_ids(&ma).0 == file_ids(&mb).0,
+        _ => true,
     }
 }
 
@@ -842,13 +883,13 @@ fn ensure_parent(dst: &Path) -> io::Result<()> {
 // Politique d'écrasement (-i, -n, -u, --update)
 // ---------------------------------------------------------------------------
 
-enum Decision {
+pub(crate) enum Decision {
     Go,
     Skip,
     Fail(String),
 }
 
-fn decide_overwrite(policy: Overwrite, src: &Path, dst: &Path, follow: bool) -> Decision {
+pub(crate) fn decide_overwrite(policy: Overwrite, src: &Path, dst: &Path, follow: bool) -> Decision {
     if dst.symlink_metadata().is_err() {
         return Decision::Go;
     }
@@ -889,7 +930,7 @@ fn confirm_overwrite(dst: &Path) -> bool {
 // ---------------------------------------------------------------------------
 
 /// -b : renomme la destination existante avant écrasement.
-fn backup_existing(dst: &Path, opts: &CopyOptions) -> io::Result<()> {
+pub(crate) fn backup_existing(dst: &Path, opts: &CopyOptions) -> io::Result<()> {
     let Some(control) = opts.backup else { return Ok(()) };
     if dst.symlink_metadata().is_err() {
         return Ok(());

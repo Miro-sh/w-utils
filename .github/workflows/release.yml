@@ -55,19 +55,23 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: rust-lld
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Generate man page
+      - name: Generate man pages
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          "./target/${{ matrix.target }}/release/wcp" --generate-man > wcp.1
-          gzip -9 wcp.1
+          for tool in wcp wmv; do
+            "./target/${{ matrix.target }}/release/$tool" --generate-man > "$tool.1"
+            gzip -9 "$tool.1"
+          done
 
       - name: Generate shell completions
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           mkdir -p completions
-          "./target/${{ matrix.target }}/release/wcp" --generate-completions bash > completions/wcp.bash
-          "./target/${{ matrix.target }}/release/wcp" --generate-completions zsh > completions/_wcp
-          "./target/${{ matrix.target }}/release/wcp" --generate-completions fish > completions/wcp.fish
+          for tool in wcp wmv; do
+            "./target/${{ matrix.target }}/release/$tool" --generate-completions bash > "completions/$tool.bash"
+            "./target/${{ matrix.target }}/release/$tool" --generate-completions zsh > "completions/_$tool"
+            "./target/${{ matrix.target }}/release/$tool" --generate-completions fish > "completions/$tool.fish"
+          done
 
       - name: Build .deb and .rpm packages
         if: matrix.target == 'x86_64-unknown-linux-musl'
@@ -82,9 +86,9 @@ jobs:
         run: |
           name="w-utils-${{ matrix.target }}"
           mkdir -p "$name"
-          cp "target/${{ matrix.target }}/release/wcp" README.md LICENSE "$name/"
-          # La page man et les complétions ne sont générées que pour Linux x86_64.
-          [ -f wcp.1.gz ] && cp wcp.1.gz "$name/" || true
+          cp "target/${{ matrix.target }}/release/wcp" "target/${{ matrix.target }}/release/wmv" README.md LICENSE "$name/"
+          # Les pages man et les complétions ne sont générées que pour Linux x86_64.
+          for f in wcp.1.gz wmv.1.gz; do [ -f "$f" ] && cp "$f" "$name/" || true; done
           [ -d completions ] && cp -r completions "$name/" || true
           tar -czf "$name.tar.gz" "$name"
 

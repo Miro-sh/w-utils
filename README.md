@@ -14,7 +14,14 @@
 
 ---
 
-Unix command-line tools, rewritten in Rust with a modern UX. The first member of the suite is **wcp**, a drop-in replacement for `cp` that shows you what it's doing: a live progress bar with throughput and ETA, and copies that never leave a half-written file behind. Same flags you already know, same exit codes your scripts already check.
+Unix command-line tools, rewritten in Rust with a modern UX. The suite ships **wcp**, a drop-in replacement for `cp`, and **wmv**, a drop-in replacement for `mv` — both show you what they're doing: a live progress bar with throughput and ETA, and operations that never leave a half-written file behind. Same flags you already know, same exit codes your scripts already check.
+
+## The suite
+
+| Tool | Replaces | In one sentence |
+|------|----------|-----------------|
+| **wcp** | `cp` | Full GNU `cp` with a progress bar, atomic writes and checksum verification |
+| **wmv** | `mv` | Instant `rename(2)` on the same filesystem; progress bar, atomic copies and `--verify` before deleting the source on cross-device moves |
 
 ## Quick install
 
@@ -205,13 +212,47 @@ Destination semantics match `cp`: an existing directory receives the source insi
 
 With the progress bar off, files go through `std::fs::copy`, which uses `copy_file_range(2)` on Linux and never leaves the kernel. With the bar on, `wcp` copies through a userspace buffer so it can count bytes as they pass: 256 KiB normally, 4 MiB for files above 1 GiB. In practice both paths saturate an NVMe drive. The buffered path costs a few percent on very fast storage and nothing you'd notice on anything slower.
 
+## wmv — mv with a progress bar
+
+`wmv` is a drop-in replacement for `mv`. On the same filesystem it does exactly what `mv` does — an instant `rename(2)`. The interesting part is cross-device moves, which are copy + delete in disguise: that's where `wmv` brings the full `wcp` engine.
+
+```
+wmv [OPTIONS] <SOURCE...> <DESTINATION>
+```
+
+All GNU `mv` flags work as expected: `-f`, `-i`, `-n`, `-u`, `-b`/`--backup`, `-S`/`--suffix`, `-t`, `-T`, `-v`, `--strip-trailing-slashes`. Plus the extras, which apply to cross-device moves:
+
+| Flag  | Long                 | Effect                                                   |
+|-------|----------------------|----------------------------------------------------------|
+| `-j N`| `--jobs=N`           | Parallel copies during cross-device moves (0 = auto)     |
+|       | `--verify`           | xxh3-checksum each copied file **before** deleting the source |
+|       | `--dry-run`          | Show what will be an instant rename vs a copy+delete     |
+|       | `--resume`           | Skip files already moved, finish the rest                |
+|       | `--bwlimit=RATE`     | Throttle the copy phase                                  |
+|       | `--exclude=PATTERN`  | Skip files matching a glob (repeatable)                  |
+|       | `--exclude-from=FILE`| Read exclusion patterns from a file                      |
+|       | `--json`             | Machine-readable summary                                 |
+|       | `--progress` / `--no-progress` | Force the bar on/off                            |
+
+```console
+$ wmv big-file.tar /mnt/usb/           # progress bar, atomic copy, then source removed
+$ wmv --verify -r ~/Photos /backup/    # every byte checksummed before the source is deleted
+$ wmv --dry-run * /mnt/other-disk/     # which entries rename instantly, which need a copy
+```
+
+Safety rules that make `wmv` stricter than `mv`:
+
+- The source is deleted **only after the copy fully succeeds**. An interrupted cross-device move leaves the source intact and no partial files at the destination.
+- Unlike `cp` (and `wcp`), `wmv` replaces a destination *symlink itself* instead of writing through it — exactly like `mv`.
+- Everything is preserved on cross-device moves, like `cp -a`: permissions, timestamps, ownership, hard links and xattrs.
+
 ## Uninstall
 
 It depends on how you installed:
 
 ```console
 # install script or manual copy (user install: look in ~/.local instead)
-$ sudo rm /usr/local/bin/wcp /usr/local/share/man/man1/wcp.1.gz
+$ sudo rm /usr/local/bin/{wcp,wmv} /usr/local/share/man/man1/{wcp,wmv}.1.gz
 
 # Debian / Ubuntu
 $ sudo apt remove w-utils
@@ -227,10 +268,10 @@ $ cargo uninstall w-utils
 
 ```console
 $ cargo build --release   # compiles with zero warnings
-$ cargo test              # 73 unit and integration tests
+$ cargo test              # 85 unit and integration tests
 ```
 
-Four small modules: `main.rs` handles orchestration, `cli.rs` defines the CLI (every GNU `cp` flag) and resolves it into an effective config, `copy.rs` plans and executes the copy, `progress.rs` owns the bar, `utils.rs` does formatting and terminal detection. New tools join the suite as additional `[[bin]]` targets in `Cargo.toml`.
+The shared engine lives in a library (`src/lib.rs`): `copy.rs` plans and executes copies, `mvops.rs` implements the rename-fast-path + EXDEV-fallback move logic, `options.rs` holds the option types common to `cp`/`mv`, `progress.rs` owns the bar, `utils.rs` does formatting and terminal detection. Each tool is a thin binary over it: `src/main.rs` + `src/cli.rs` for `wcp`, `src/bin/wmv.rs` for `wmv`. New tools join the suite as additional `[[bin]]` targets in `Cargo.toml`.
 
 ## Contributing
 

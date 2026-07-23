@@ -23,6 +23,29 @@ pub fn print_error(msg: &str) {
     eprintln!("{} {}", "✗".red().bold(), msg);
 }
 
+/// Échappe une chaîne pour du JSON (sorties --json de la suite).
+pub fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Tableau JSON de chaînes : ["a","b"].
+pub fn json_string_array(items: &[String]) -> String {
+    let inner: Vec<String> = items.iter().map(|s| format!("\"{}\"", json_escape(s))).collect();
+    format!("[{}]", inner.join(","))
+}
+
 /// Formate une durée de façon compacte : "4.2s", "1m 15s", "1:01:01".
 pub fn format_duration(d: Duration) -> String {
     let secs = d.as_secs();

@@ -1,15 +1,19 @@
 [package]
 name = "w-utils"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-description = "w-utils — modern Unix utilities in Rust (wcp: cp with a progress bar)"
+description = "w-utils — modern Unix utilities in Rust (wcp: cp with a progress bar, wmv: mv with a progress bar)"
 license = "MIT"
 repository = "https://github.com/Miro-sh/w-utils"
 
-# La suite w-utils produira plusieurs binaires ; le premier est wcp.
+# La suite w-utils produira plusieurs binaires.
 [[bin]]
 name = "wcp"
 path = "src/main.rs"
+
+[[bin]]
+name = "wmv"
+path = "src/bin/wmv.rs"
 
 # Métadonnées pour les paquets .deb (cargo-deb) et .rpm (cargo-generate-rpm).
 # Le binaire musl étant statique, aucune dépendance n'est déclarée.
@@ -21,10 +25,15 @@ priority = "optional"
 depends = ""
 assets = [
     ["target/release/wcp", "usr/bin/", "755"],
+    ["target/release/wmv", "usr/bin/", "755"],
     ["wcp.1.gz", "usr/share/man/man1/", "644"],
+    ["wmv.1.gz", "usr/share/man/man1/", "644"],
     ["completions/wcp.bash", "usr/share/bash-completion/completions/wcp", "644"],
+    ["completions/wmv.bash", "usr/share/bash-completion/completions/wmv", "644"],
     ["completions/_wcp", "usr/share/zsh/site-functions/_wcp", "644"],
+    ["completions/_wmv", "usr/share/zsh/site-functions/_wmv", "644"],
     ["completions/wcp.fish", "usr/share/fish/vendor_completions.d/wcp.fish", "644"],
+    ["completions/wmv.fish", "usr/share/fish/vendor_completions.d/wmv.fish", "644"],
     ["README.md", "usr/share/doc/w-utils/README", "644"],
 ]
 
@@ -34,10 +43,15 @@ name = "w-utils"
 # chemin complet vers le binaire musl produit par .cargo/config.toml.
 assets = [
     { source = "target/x86_64-unknown-linux-musl/release/wcp", dest = "/usr/bin/wcp", mode = "755" },
+    { source = "target/x86_64-unknown-linux-musl/release/wmv", dest = "/usr/bin/wmv", mode = "755" },
     { source = "wcp.1.gz", dest = "/usr/share/man/man1/wcp.1.gz", mode = "644" },
+    { source = "wmv.1.gz", dest = "/usr/share/man/man1/wmv.1.gz", mode = "644" },
     { source = "completions/wcp.bash", dest = "/usr/share/bash-completion/completions/wcp", mode = "644" },
+    { source = "completions/wmv.bash", dest = "/usr/share/bash-completion/completions/wmv", mode = "644" },
     { source = "completions/_wcp", dest = "/usr/share/zsh/site-functions/_wcp", mode = "644" },
+    { source = "completions/_wmv", dest = "/usr/share/zsh/site-functions/_wmv", mode = "644" },
     { source = "completions/wcp.fish", dest = "/usr/share/fish/vendor_completions.d/wcp.fish", mode = "644" },
+    { source = "completions/wmv.fish", dest = "/usr/share/fish/vendor_completions.d/wmv.fish", mode = "644" },
     { source = "README.md", dest = "/usr/share/doc/w-utils/README", mode = "644" },
 ]
 

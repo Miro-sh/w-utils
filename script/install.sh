@@ -1,5 +1,5 @@
 #!/bin/sh
-# wcp installer — downloads the latest release binary and installs it.
+# w-utils installer — downloads the latest release binaries (wcp, wmv) and installs them.
 #
 #   curl -sSfL https://raw.githubusercontent.com/Miro-sh/w-utils/main/script/install.sh | sh
 #
@@ -57,22 +57,24 @@ fi
 
 tar -xzf "$tmp/$asset" -C "$tmp"
 pkg_dir="$tmp/w-utils-${arch_part}-${os_part}"
-bin="$pkg_dir/wcp"
+TOOLS="wcp wmv"
 
-# Installe la page man si l'archive la contient (Linux seulement).
+# Installe les pages man si l'archive les contient (Linux seulement).
 # $1: "system" (/usr/local/share/man) ou "user" (~/.local/share/man)
 # $2: "" ou "sudo"
 install_man() {
-    [ -f "$pkg_dir/wcp.1.gz" ] || return 0
     if [ "$1" = system ]; then
         mandir=/usr/local/share/man/man1
     else
         mandir="$HOME/.local/share/man/man1"
     fi
-    $2 mkdir -p "$mandir"
-    $2 install -m 644 "$pkg_dir/wcp.1.gz" "$mandir/"
+    for tool in $TOOLS; do
+        [ -f "$pkg_dir/$tool.1.gz" ] || continue
+        $2 mkdir -p "$mandir"
+        $2 install -m 644 "$pkg_dir/$tool.1.gz" "$mandir/"
+    done
     if [ "$1" = user ]; then
-        echo "w-utils: man page installed to $mandir (add it to MANPATH if 'man wcp' fails)"
+        echo "w-utils: man pages installed to $mandir (add it to MANPATH if 'man wcp' fails)"
     fi
 }
 
@@ -84,9 +86,11 @@ elif [ -w /usr/local/bin ]; then
     mode=system
 elif command -v sudo >/dev/null 2>&1; then
     echo "w-utils: installing to /usr/local/bin (sudo)"
-    sudo install -m 755 "$bin" /usr/local/bin/wcp
+    for tool in $TOOLS; do
+        sudo install -m 755 "$pkg_dir/$tool" /usr/local/bin/"$tool"
+    done
     install_man system sudo
-    echo "w-utils: installed, run 'wcp --help' or 'man wcp' to get started"
+    echo "w-utils: installed, run 'wcp --help' / 'wmv --help' to get started"
     exit 0
 else
     dest="$HOME/.local/bin"
@@ -94,7 +98,9 @@ else
 fi
 
 mkdir -p "$dest"
-install -m 755 "$bin" "$dest/wcp"
+for tool in $TOOLS; do
+    install -m 755 "$pkg_dir/$tool" "$dest/$tool"
+done
 install_man "$mode" ""
 
 case ":$PATH:" in
@@ -102,4 +108,4 @@ case ":$PATH:" in
     *) echo "w-utils: note: $dest is not in your PATH" ;;
 esac
 
-echo "w-utils: installed to $dest/wcp, run 'wcp --help' to get started"
+echo "w-utils: installed to $dest ($TOOLS), run 'wcp --help' to get started"

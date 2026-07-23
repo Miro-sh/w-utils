@@ -1,15 +1,13 @@
 //! wcp — cp(1) GNU avec barre de progression (suite w-utils).
 
 mod cli;
-mod copy;
-mod progress;
-mod utils;
 
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
 use humansize::{format_size, DECIMAL};
+use w_utils::{copy, progress, utils};
 
 use cli::{Args, Config, CopyMode, Overwrite};
 use copy::{CopyOptions, PlanEntry};
@@ -150,61 +148,16 @@ fn run(args: &Args) -> Result<()> {
     Ok(())
 }
 
-/// Construit le matcher --exclude / --exclude-from (lignes vides et
-/// commentaires # ignorés, comme rsync).
+/// Construit le matcher --exclude / --exclude-from.
 fn build_exclude_matcher(cfg: &Config) -> Result<Option<globset::GlobSet>> {
-    let mut patterns = cfg.exclude.clone();
-    for file in &cfg.exclude_from {
-        let content = std::fs::read_to_string(file)
-            .with_context(|| format!("impossible de lire le fichier d'exclusions '{}'", file.display()))?;
-        for line in content.lines() {
-            let line = line.trim();
-            if !line.is_empty() && !line.starts_with('#') {
-                patterns.push(line.to_string());
-            }
-        }
-    }
-    if patterns.is_empty() {
-        return Ok(None);
-    }
-    let mut builder = globset::GlobSetBuilder::new();
-    for pat in &patterns {
-        // literal_separator(false) : '*' traverse les '/', donc "*.log"
-        // exclut aussi "sub/dir/x.log" (comportement type rsync).
-        builder.add(
-            globset::GlobBuilder::new(pat)
-                .literal_separator(false)
-                .build()
-                .with_context(|| format!("motif d'exclusion invalide : '{pat}'"))?,
-        );
-    }
-    Ok(Some(builder.build().expect("globset construit")))
+    copy::build_exclude_matcher(&cfg.exclude, &cfg.exclude_from)
 }
 
 // ---------------------------------------------------------------------------
 // Sortie JSON (--json)
 // ---------------------------------------------------------------------------
 
-fn json_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out
-}
-
-fn json_string_array(items: &[String]) -> String {
-    let inner: Vec<String> = items.iter().map(|s| format!("\"{}\"", json_escape(s))).collect();
-    format!("[{}]", inner.join(","))
-}
+use utils::{json_escape, json_string_array};
 
 fn json_summary(plan: &copy::CopyPlan, stats: &copy::CopyStats, elapsed: Duration) -> String {
     format!(
